@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register — SQLiLab</title>
+  <meta name="description" content="Register an account and see how bcrypt hashes your password in real time." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #080b14;
+      --surface: #0e1324;
+      --surface2:#141928;
+      --border:  #1e2a45;
+      --accent:  #6c63ff;
+      --accent2: #a78bfa;
+      --cyan:    #22d3ee;
+      --green:   #34d399;
+      --red:     #f87171;
+      --orange:  #fb923c;
+      --yellow:  #fbbf24;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --font:    'Inter', sans-serif;
+      --mono:    'JetBrains Mono', monospace;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: var(--font); font-size: 15px;
+      line-height: 1.6; min-height: 100vh;
+    }
+    .bg-grid {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(108,99,255,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(108,99,255,.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .bg-glow {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(108,99,255,.15), transparent);
+    }
+    /* Navbar */
+    .navbar {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(8,11,20,.9); backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      max-width: 1400px; margin: 0 auto; padding: 0 1.5rem;
+      display: flex; align-items: center; gap: 1.5rem; height: 60px;
+    }
+    .nav-logo { font-weight: 800; font-size: 1.15rem; color: var(--text); text-decoration: none; display: flex; align-items: center; gap: .4rem; }
+    .logo-accent { color: var(--accent2); }
+    .nav-links { display: flex; gap: .2rem; list-style: none; flex: 1; }
+    .nav-link { padding: .35rem .75rem; border-radius: 6px; color: var(--muted); text-decoration: none; font-size: .82rem; font-weight: 500; transition: color .2s, background .2s; }
+    .nav-link:hover { color: var(--text); background: rgba(108,99,255,.1); }
+    .nav-link.active { color: var(--accent2); background: rgba(108,99,255,.12); }
+
+    /* Page */
+    .page {
+      position: relative; z-index: 1;
+      max-width: 1200px; margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 2.5rem; align-items: start;
+    }
+
+    /* Form Panel */
+    .form-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 2rem;
+    }
+    .form-title { font-size: 1.6rem; font-weight: 800; margin-bottom: .3rem; }
+    .gradient-text {
+      background: linear-gradient(135deg, var(--accent), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .form-sub { color: var(--muted); font-size: .88rem; margin-bottom: 1.75rem; }
+
+    .field { margin-bottom: 1.1rem; }
+    .field label { display: block; font-size: .76rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: .4rem; }
+    .field input {
+      width: 100%; padding: .7rem 1rem;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text);
+      font-family: var(--font); font-size: .9rem;
+      transition: border-color .2s, box-shadow .2s; outline: none;
+    }
+    .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108,99,255,.15); }
+    .field input.valid   { border-color: var(--green); }
+    .field input.invalid { border-color: var(--red); }
+
+    /* Strength meter */
+    .strength-row { display: flex; gap: 4px; margin-top: .45rem; }
+    .strength-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--border); transition: background .3s; }
+    .strength-label { font-size: .72rem; color: var(--muted); margin-top: .3rem; }
+
+    .submit-btn {
+      width: 100%; padding: .85rem; border-radius: 9px;
+      font-family: var(--font); font-size: 1rem; font-weight: 700;
+      cursor: pointer; border: none;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; box-shadow: 0 4px 20px rgba(108,99,255,.4);
+      transition: all .25s; margin-top: .5rem;
+    }
+    .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(108,99,255,.55); }
+    .submit-btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+
+    .result-box {
+      padding: .9rem 1.1rem; border-radius: 9px; font-size: .88rem;
+      margin-top: 1rem; display: none; line-height: 1.55;
+    }
+    .result-box.show { display: block; }
+    .result-box.success { background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.3); color: var(--green); }
+    .result-box.error   { background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.3); color: var(--red); }
+
+    /* Right panel */
+    .right-col { display: flex; flex-direction: column; gap: 1.25rem; }
+
+    /* Hash visualizer */
+    .hash-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 1.5rem;
+    }
+    .panel-title { font-size: .98rem; font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: .5rem; }
+
+    .hash-row { margin-bottom: 1rem; }
+    .hash-row-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; margin-bottom: .4rem; }
+    .hash-row-label.danger  { color: var(--red); }
+    .hash-row-label.safe    { color: var(--green); }
+    .hash-display {
+      padding: .7rem .9rem; border-radius: 8px;
+      font-family: var(--mono); font-size: .82rem;
+      word-break: break-all; line-height: 1.55;
+    }
+    .hash-display.plaintext {
+      background: rgba(248,113,113,.07); border: 1px solid rgba(248,113,113,.2);
+      color: var(--red);
+    }
+    .hash-display.hashed {
+      background: rgba(52,211,153,.06); border: 1px solid rgba(52,211,153,.18);
+      color: var(--green);
+    }
+    .hash-display.empty { color: var(--muted); font-style: italic; }
+
+    .bcrypt-badge {
+      display: inline-block; padding: .2rem .6rem; border-radius: 5px;
+      font-size: .7rem; font-weight: 700;
+      background: rgba(108,99,255,.15); color: var(--accent2);
+      border: 1px solid rgba(108,99,255,.25); margin-top: .5rem;
+    }
+
+    /* Steps */
+    .steps { display: flex; flex-direction: column; gap: .65rem; margin-top: .5rem; }
+    .step {
+      display: flex; align-items: flex-start; gap: .75rem;
+      padding: .75rem .9rem; border-radius: 9px;
+      background: var(--surface2); border: 1px solid var(--border);
+      font-size: .82rem; line-height: 1.5;
+    }
+    .step-num {
+      width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .7rem; font-weight: 800;
+      background: rgba(108,99,255,.2); color: var(--accent2);
+    }
+    .step-num.active { background: var(--accent); color: #fff; box-shadow: 0 0 10px rgba(108,99,255,.5); }
+    .step-num.done   { background: rgba(52,211,153,.2); color: var(--green); }
+
+    /* Loading */
+    .hash-loading { display: none; }
+    .hash-loading.show { display: flex; align-items: center; gap: .5rem; color: var(--muted); font-size: .82rem; margin-top: .35rem; }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(108,99,255,.3); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: .8rem 1.1rem;
+      font-size: .85rem; color: var(--text);
+      transform: translateY(120%); opacity: 0;
+      transition: all .3s; box-shadow: 0 8px 32px rgba(0,0,0,.5); max-width: 340px;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: var(--green); color: var(--green); }
+    .toast.error   { border-color: var(--red);   color: var(--red);   }
+
+    @media (max-width: 860px) {
+      .page { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="bg-glow" aria-hidden="true"></div>
+
+<nav class="navbar" role="navigation">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">⚡ SQLi<span class="logo-accent">Lab</span></a>
+    <ul class="nav-links" role="list">
+      <li><a href="/"          class="nav-link">Home</a></li>
+      <li><a href="/register"  class="nav-link active">Register</a></li>
+      <li><a href="/login"     class="nav-link">Login</a></li>
+      <li><a href="/inspector" class="nav-link">Inspector</a></li>
+      <li><a href="/dashboard" class="nav-link">Dashboard</a></li>
+      <li><a href="/admin"     class="nav-link">Admin Panel</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- LEFT: Registration form -->
+  <div class="form-card">
+    <h1 class="form-title">Create <span class="gradient-text">Account</span></h1>
+    <p class="form-sub">Register and watch your password get hashed in real time →</p>
+
+    <div class="field">
+      <label for="reg-username">Username</label>
+      <input type="text" id="reg-username" placeholder="e.g. alice" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="reg-email">Email</label>
+      <input type="email" id="reg-email" placeholder="alice@example.com" />
+    </div>
+    <div class="field">
+      <label for="reg-password">Password</label>
+      <input type="password" id="reg-password" placeholder="min 8 characters" />
+      <div class="strength-row" id="strength-bars">
+        <div class="strength-bar" id="sb1"></div>
+        <div class="strength-bar" id="sb2"></div>
+        <div class="strength-bar" id="sb3"></div>
+        <div class="strength-bar" id="sb4"></div>
+      </div>
+      <div class="strength-label" id="strength-label">Enter a password</div>
+    </div>
+    <div class="field">
+      <label for="reg-confirm">Confirm Password</label>
+      <input type="password" id="reg-confirm" placeholder="repeat password" />
+    </div>
+
+    <button class="submit-btn" id="reg-submit" onclick="doRegister()">Create Account →</button>
+
+    <div class="result-box" id="reg-result"></div>
+
+    <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border);font-size:.82rem;color:var(--muted)">
+      Already have an account? <a href="/login" style="color:var(--accent2);text-decoration:none">Login here</a>
+    </div>
+  </div>
+
+  <!-- RIGHT: Hash visualizer + steps -->
+  <div class="right-col">
+
+    <!-- Live Hash Display -->
+    <div class="hash-card">
+      <div class="panel-title">🔐 Live Hash Visualizer</div>
+
+      <div class="hash-row">
+        <div class="hash-row-label danger">❌ Plaintext (Never Stored)</div>
+        <div class="hash-display plaintext empty" id="plain-display">Type a password to see it here…</div>
+      </div>
+
+      <div style="text-align:center;font-size:1.2rem;margin:.4rem 0;color:var(--muted)">↓ bcrypt hashes this</div>
+
+      <div class="hash-row">
+        <div class="hash-row-label safe">✅ Stored in Database (bcrypt)</div>
+        <div class="hash-display hashed empty" id="hash-display">Hash will appear here…</div>
+        <div class="hash-loading" id="hash-loading"><span class="spinner"></span> Hashing…</div>
+        <div id="hash-meta" style="display:none;margin-top:.5rem">
+          <span class="bcrypt-badge">$2b$ — bcrypt</span>
+          <span class="bcrypt-badge">Work factor: 12</span>
+          <span class="bcrypt-badge">Salt: embedded</span>
+        </div>
+      </div>
+
+      <div style="margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--border);font-size:.8rem;color:var(--muted);line-height:1.55">
+        💡 <strong style="color:var(--text)">Notice:</strong> Even if you type the same password twice, bcrypt generates a <em>different</em> hash each time due to a random salt — making rainbow table attacks useless.
+      </div>
+    </div>
+
+    <!-- 3-step educational panel -->
+    <div class="hash-card">
+      <div class="panel-title">📖 How Password Hashing Works</div>
+      <div class="steps">
+        <div class="step" id="step1">
+          <div class="step-num" id="step1-num">1</div>
+          <div>
+            <strong>User types password</strong><br>
+            <span style="color:var(--muted)">"mypassword123" — exists only in memory, never written to disk.</span>
+          </div>
+        </div>
+        <div class="step" id="step2">
+          <div class="step-num" id="step2-num">2</div>
+          <div>
+            <strong>bcrypt hashes it</strong><br>
+            <span style="color:var(--muted)">Applies 2<sup>12</sup> = 4,096 iterations with a random 128-bit salt. Takes ~200ms deliberately.</span>
+          </div>
+        </div>
+        <div class="step" id="step3">
+          <div class="step-num" id="step3-num">3</div>
+          <div>
+            <strong>Only the hash is stored</strong><br>
+            <span style="color:var(--muted)">The <code style="font-family:var(--mono);color:var(--accent2)">$2b$12$...</code> string goes to the DB. The original password is gone forever.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  let debounceTimer = null;
+  let toastTimer = null;
+
+  function toast(msg, type = '') {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.className = 'toast', 3500);
+  }
+
+  /* Strength meter */
+  function measureStrength(pw) {
+    let score = 0;
+    if (pw.length >= 8)  score++;
+    if (pw.length >= 12) score++;
+    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    return Math.min(score, 4);
+  }
+
+  function updateStrength(pw) {
+    const score = measureStrength(pw);
+    const colors = ['', '#f87171', '#fb923c', '#fbbf24', '#34d399'];
+    const labels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
+    for (let i = 1; i <= 4; i++) {
+      $('sb' + i).style.background = i <= score ? colors[score] : 'var(--border)';
+    }
+    $('strength-label').textContent = pw ? labels[score] || 'Weak' : 'Enter a password';
+    $('strength-label').style.color = pw ? colors[score] : 'var(--muted)';
+  }
+
+  /* Live hash */
+  async function fetchHash(pw) {
+    if (!pw) {
+      $('plain-display').textContent = 'Type a password to see it here…';
+      $('plain-display').classList.add('empty');
+      $('hash-display').textContent = 'Hash will appear here…';
+      $('hash-display').classList.add('empty');
+      $('hash-meta').style.display = 'none';
+      resetSteps();
+      return;
+    }
+
+    $('plain-display').textContent = pw;
+    $('plain-display').classList.remove('empty');
+
+    $('hash-loading').classList.add('show');
+    $('hash-display').classList.add('empty');
+
+    activateStep(1);
+
+    try {
+      const res = await fetch('/api/demo/hash-demo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw })
+      });
+      if (!res.ok) throw new Error('Hash failed');
+      const data = await res.json();
+
+      activateStep(2);
+      await new Promise(r => setTimeout(r, 300));
+      activateStep(3);
+
+      const hash = (data.bcrypt && data.bcrypt.hash) || data.bcrypt_hash || data.hash || '';
+      $('hash-display').textContent = hash || 'Error generating hash';
+      $('hash-display').classList.remove('empty');
+      $('hash-meta').style.display = 'block';
+    } catch {
+      $('hash-display').textContent = 'Error — is the server running?';
+    } finally {
+      $('hash-loading').classList.remove('show');
+    }
+  }
+
+  function resetSteps() {
+    for (let i = 1; i <= 3; i++) {
+      $('step' + i + '-num').className = 'step-num';
+    }
+  }
+  function activateStep(n) {
+    for (let i = 1; i <= 3; i++) {
+      const el = $('step' + i + '-num');
+      if (i < n)  el.className = 'step-num done';
+      else if (i === n) el.className = 'step-num active';
+      else el.className = 'step-num';
+    }
+  }
+
+  $('reg-password').addEventListener('input', () => {
+    const pw = $('reg-password').value;
+    updateStrength(pw);
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => fetchHash(pw), 500);
+  });
+
+  /* Confirm match */
+  $('reg-confirm').addEventListener('input', () => {
+    const pw   = $('reg-password').value;
+    const conf = $('reg-confirm').value;
+    if (conf && pw) {
+      $('reg-confirm').className = pw === conf ? 'valid' : 'invalid';
+    }
+  });
+
+  /* Register */
+  window.doRegister = async function() {
+    const username = $('reg-username').value.trim();
+    const email    = $('reg-email').value.trim();
+    const password = $('reg-password').value;
+    const confirm  = $('reg-confirm').value;
+
+    if (!username || !email || !password) {
+      showResult('error', '⚠️ All fields are required.'); return;
+    }
+    if (password !== confirm) {
+      showResult('error', '❌ Passwords do not match.'); return;
+    }
+    if (password.length < 8) {
+      showResult('error', '❌ Password must be at least 8 characters.'); return;
+    }
+
+    const btn = $('reg-submit');
+    btn.disabled = true;
+    btn.textContent = 'Creating account…';
+
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password, confirm_password: confirm })
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        const hash = data.password_hash || '';
+        showResult('success',
+          `✅ <strong>Account created!</strong><br>
+           Username: <strong>${esc(data.username || username)}</strong><br>
+           ${hash ? `Stored hash: <code style="font-family:var(--mono);font-size:.8rem;word-break:break-all">${esc(hash.slice(0,40))}…</code>` : ''}
+           <br><br>
+           Your plaintext password was <strong>never stored</strong>. Only the bcrypt hash above is in the database.
+           <br><br><a href="/login" style="color:var(--accent2);text-decoration:none;font-weight:700">→ Go to Login</a>`);
+        toast('Account created successfully!', 'success');
+      } else {
+        showResult('error', `❌ ${data.error || 'Registration failed'}`);
+        toast(data.error || 'Registration failed', 'error');
+      }
+    } catch (err) {
+      showResult('error', `⚠️ ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Create Account →';
+    }
+  };
+
+  function showResult(type, html) {
+    const box = $('reg-result');
+    box.className = 'result-box show ' + type;
+    box.innerHTML = html;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  $('reg-username').addEventListener('keydown', e => { if (e.key === 'Enter') $('reg-email').focus(); });
+  $('reg-email').addEventListener('keydown',    e => { if (e.key === 'Enter') $('reg-password').focus(); });
+  $('reg-password').addEventListener('keydown', e => { if (e.key === 'Enter') $('reg-confirm').focus(); });
+  $('reg-confirm').addEventListener('keydown',  e => { if (e.key === 'Enter') window.doRegister(); });
+})();
+</script>
+</body>
+</html>

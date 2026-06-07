@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Login — SQLiLab Demo 1 &amp; 2</title>
+  <meta name="description" content="Interactive SQL Injection login bypass demo (Demo 1 Legacy App) and bcrypt-resistant modern login (Demo 2). Full attack chain from payload to admin session."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #080b14; --s1: #0e1324; --s2: #141928; --s3: #1a2035;
+      --b1: #1e2a45; --b2: #253354;
+      --purple: #6c63ff; --purple2: #a78bfa;
+      --cyan: #22d3ee; --green: #34d399; --red: #f87171;
+      --orange: #fb923c; --yellow: #fbbf24;
+      --text: #e2e8f0; --muted: #64748b;
+      --mono: 'JetBrains Mono', monospace; --font: 'Inter', sans-serif;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.55; min-height: 100vh; }
+    .bg-grid { position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image: linear-gradient(rgba(108,99,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(108,99,255,.04) 1px, transparent 1px);
+      background-size: 40px 40px; }
+
+    /* ── Nav ── */
+    .nav { position: sticky; top: 0; z-index: 100; background: rgba(8,11,20,.95); backdrop-filter: blur(20px); border-bottom: 1px solid var(--b1); }
+    .nav-i { max-width: 1400px; margin: 0 auto; padding: 0 1.2rem; display: flex; align-items: center; gap: .8rem; height: 54px; }
+    .nav-logo { font-weight: 900; font-size: 1rem; color: var(--text); text-decoration: none; }
+    .nav-logo span { color: var(--purple2); }
+    .nav-links { display: flex; gap: .1rem; list-style: none; flex: 1; flex-wrap: wrap; }
+    .nav-link { padding: .25rem .6rem; border-radius: 6px; color: var(--muted); text-decoration: none; font-size: .77rem; font-weight: 500; transition: all .18s; }
+    .nav-link:hover { color: var(--text); background: rgba(108,99,255,.1); }
+    .nav-link.active { color: var(--orange); background: rgba(251,146,60,.1); }
+
+    .page { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 1.4rem 1.2rem 5rem; }
+
+    /* ── Demo Selector ── */
+    .demo-sel { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-bottom: 1rem; }
+    .demo-card { border-radius: 11px; border: 2px solid var(--b1); padding: 1rem 1.2rem; cursor: pointer; transition: all .2s; background: var(--s1); position: relative; overflow: hidden; }
+    .demo-card::before { content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity .2s; }
+    .demo-card.legacy::before { background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(251,146,60,.1), transparent); }
+    .demo-card.modern::before { background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(52,211,153,.08), transparent); }
+    .demo-card.active::before { opacity: 1; }
+    .demo-card.legacy.active { border-color: rgba(251,146,60,.6); box-shadow: 0 0 28px rgba(251,146,60,.12); }
+    .demo-card.modern.active { border-color: rgba(52,211,153,.55); box-shadow: 0 0 28px rgba(52,211,153,.1); }
+    .demo-card:hover:not(.active) { border-color: var(--b2); }
+    .dc-top { display: flex; align-items: flex-start; gap: .65rem; margin-bottom: .45rem; }
+    .dc-icon { font-size: 1.6rem; line-height: 1; flex-shrink: 0; }
+    .dc-label { flex: 1; }
+    .dc-name { font-weight: 900; font-size: .92rem; margin-bottom: .08rem; }
+    .demo-card.legacy .dc-name { color: var(--orange); }
+    .demo-card.modern .dc-name { color: var(--green); }
+    .dc-sub { font-size: .73rem; color: var(--muted); }
+    .dc-radio { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--b1); flex-shrink: 0; margin-top: .1rem; transition: all .18s; }
+    .demo-card.legacy.active .dc-radio { border-color: var(--orange); background: var(--orange); box-shadow: 0 0 0 3px rgba(251,146,60,.2); }
+    .demo-card.modern.active .dc-radio { border-color: var(--green); background: var(--green); box-shadow: 0 0 0 3px rgba(52,211,153,.18); }
+    .dc-tags { display: flex; flex-wrap: wrap; gap: .28rem; }
+    .tag { font-size: .62rem; font-weight: 700; padding: .08rem .36rem; border-radius: 3px; text-transform: uppercase; letter-spacing: .05em; }
+    .t-o { background: rgba(251,146,60,.1); border: 1px solid rgba(251,146,60,.2); color: var(--orange); }
+    .t-g { background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.18); color: var(--green); }
+    .t-r { background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.18); color: var(--red); }
+    .t-b { background: rgba(100,116,139,.08); border: 1px solid rgba(100,116,139,.15); color: var(--muted); }
+
+    /* ── Attack Chain ── */
+    .attack-chain { display: flex; align-items: center; padding: .45rem .9rem; background: var(--s2); border: 1px solid var(--b1); border-radius: 8px; margin-bottom: 1rem; overflow-x: auto; gap: 0; flex-wrap: nowrap; }
+    .ac-step { display: flex; align-items: center; gap: .25rem; font-size: .7rem; font-weight: 600; white-space: nowrap; color: var(--muted); padding: .12rem .2rem; border-radius: 4px; transition: all .3s; }
+    .ac-step.active { color: var(--orange); }
+    .ac-step.done { color: var(--green); }
+    .ac-step.current { color: var(--yellow); animation: pulse-y .8s ease infinite alternate; }
+    @keyframes pulse-y { from { opacity: .7; } to { opacity: 1; } }
+    .ac-arrow { color: var(--b2); margin: 0 .2rem; font-size: .8rem; }
+
+    /* ── 3-col layout ── */
+    .cols3 { display: grid; grid-template-columns: 340px 1fr 360px; gap: .85rem; align-items: start; }
+
+    /* ── Card ── */
+    .card { background: var(--s1); border: 1px solid var(--b1); border-radius: 11px; overflow: hidden; margin-bottom: .7rem; }
+    .card:last-child { margin-bottom: 0; }
+    .ch { padding: .65rem 1rem; border-bottom: 1px solid var(--b1); display: flex; align-items: center; justify-content: space-between; gap: .4rem; }
+    .ct { font-weight: 800; font-size: .83rem; display: flex; align-items: center; gap: .35rem; }
+    .cb { padding: .85rem 1rem; }
+
+    /* ── Badge ── */
+    .badge { display: inline-flex; align-items: center; padding: .12rem .42rem; border-radius: 4px; font-size: .61rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+    .b-o { background: rgba(251,146,60,.1); border: 1px solid rgba(251,146,60,.22); color: var(--orange); }
+    .b-g { background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.18); color: var(--green); }
+    .b-r { background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.2); color: var(--red); }
+    .b-c { background: rgba(34,211,238,.07); border: 1px solid rgba(34,211,238,.15); color: var(--cyan); }
+    .b-m { background: rgba(100,116,139,.07); border: 1px solid rgba(100,116,139,.15); color: var(--muted); }
+    .b-crit { background: rgba(248,113,113,.15); border: 1px solid rgba(248,113,113,.4); color: var(--red); animation: blink-r .9s ease infinite alternate; }
+    @keyframes blink-r { from { box-shadow: 0 0 0 rgba(248,113,113,.3); } to { box-shadow: 0 0 10px rgba(248,113,113,.3); } }
+
+    /* ── Payload chips ── */
+    .payload-section { margin-bottom: .7rem; }
+    .ps-label { font-size: .67rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: .35rem; display: flex; align-items: center; gap: .3rem; }
+    .chips { display: flex; flex-direction: column; gap: .28rem; }
+    .chip { display: flex; align-items: center; padding: .38rem .7rem; border-radius: 7px; font-size: .75rem; cursor: pointer; border: 1px solid; transition: all .17s; gap: .4rem; }
+    .chip-meta { font-family: var(--mono); font-weight: 700; flex: 1; font-size: .73rem; }
+    .chip-tag { font-size: .6rem; font-weight: 700; text-transform: uppercase; opacity: .65; flex-shrink: 0; }
+    .ch-inj { border-color: rgba(248,113,113,.3); background: rgba(248,113,113,.05); color: var(--red); }
+    .ch-inj:hover { background: rgba(248,113,113,.12); border-color: rgba(248,113,113,.5); }
+    .ch-inj.selected { background: rgba(248,113,113,.14); border-color: var(--red); box-shadow: 0 0 0 1px rgba(248,113,113,.3); }
+    .ch-ok { border-color: rgba(52,211,153,.25); background: rgba(52,211,153,.04); color: var(--green); }
+    .ch-ok:hover { background: rgba(52,211,153,.1); }
+    .ch-ok.selected { background: rgba(52,211,153,.12); border-color: var(--green); }
+
+    /* ── Form ── */
+    .field { margin-bottom: .65rem; }
+    .field label { display: block; font-size: .69rem; font-weight: 700; color: var(--muted); margin-bottom: .28rem; text-transform: uppercase; letter-spacing: .05em; }
+    .field input { width: 100%; padding: .58rem .8rem; border-radius: 7px; border: 1px solid var(--b1); background: var(--s2); color: var(--text); font-family: var(--mono); font-size: .82rem; outline: none; transition: border-color .18s; }
+    .field input:focus { border-color: var(--orange); }
+    .field input.injecting { border-color: rgba(248,113,113,.6); background: rgba(248,113,113,.04); }
+
+    .btn-attack { width: 100%; padding: .82rem; border-radius: 8px; border: none; cursor: pointer; font-family: var(--font); font-size: .88rem; font-weight: 800; letter-spacing: .02em; transition: all .2s; background: linear-gradient(135deg, #c2410c, var(--orange)); color: #fff; box-shadow: 0 4px 18px rgba(251,146,60,.3); }
+    .btn-attack:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 26px rgba(251,146,60,.45); }
+    .btn-attack:disabled { opacity: .45; cursor: not-allowed; transform: none !important; }
+    .btn-modern { background: linear-gradient(135deg, #065f46, var(--green)); box-shadow: 0 4px 18px rgba(52,211,153,.22); }
+    .btn-modern:hover:not(:disabled) { box-shadow: 0 8px 26px rgba(52,211,153,.38); }
+
+    .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,.25); border-top-color: #fff; border-radius: 50%; animation: rot .7s linear infinite; vertical-align: middle; margin-right: .3rem; }
+    @keyframes rot { to { transform: rotate(360deg); } }
+
+    /* ── SQL Box ── */
+    .sql-wrap { background: #04060f; border: 1px solid var(--b1); border-radius: 8px; overflow: hidden; margin-bottom: .65rem; }
+    .sql-hdr { padding: .28rem .7rem; background: var(--s2); border-bottom: 1px solid var(--b1); font-size: .63rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+    .sql-pre { padding: .65rem .8rem; font-family: var(--mono); font-size: .76rem; line-height: 1.75; overflow-x: auto; white-space: pre; min-height: 60px; }
+    .kw { color: #c084fc; } .str { color: #4ade80; } .cmt { color: #4b5563; font-style: italic; } .num { color: #fb923c; }
+    .inj-u { color: #f87171; font-weight: 700; border-bottom: 2px solid rgba(248,113,113,.5); }
+    .inj-p { color: #fbbf24; font-weight: 700; border-bottom: 2px solid rgba(251,191,36,.4); }
+    .inj-cmt { color: #6b7280; font-style: italic; text-decoration: line-through rgba(107,114,128,.4); }
+
+    /* ── Injection Flow ── */
+    .flow { display: flex; flex-direction: column; gap: 0; }
+    .flow-step { display: flex; gap: .65rem; align-items: flex-start; padding: .5rem 0; border-bottom: 1px solid rgba(30,42,69,.5); }
+    .flow-step:last-child { border-bottom: none; }
+    .fs-num { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .65rem; font-weight: 800; flex-shrink: 0; margin-top: .1rem; }
+    .fsn-gray { background: var(--s3); color: var(--muted); border: 1px solid var(--b1); }
+    .fsn-orange { background: rgba(251,146,60,.15); color: var(--orange); border: 1px solid rgba(251,146,60,.3); }
+    .fsn-red { background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.25); }
+    .fsn-green { background: rgba(52,211,153,.1); color: var(--green); border: 1px solid rgba(52,211,153,.2); }
+    .fs-content { flex: 1; min-width: 0; }
+    .fs-title { font-size: .69rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: .2rem; }
+    .fs-body { font-family: var(--mono); font-size: .73rem; line-height: 1.55; word-break: break-word; white-space: pre-wrap; }
+    .fs-note { font-size: .7rem; color: var(--muted); margin-top: .18rem; line-height: 1.45; font-family: var(--font); }
+    .fs-arrow { color: var(--b2); font-size: 1.1rem; display: flex; align-items: center; justify-content: center; width: 22px; flex-shrink: 0; padding-top: .35rem; }
+
+    /* ── Results Table ── */
+    .rt { width: 100%; border-collapse: collapse; font-size: .75rem; }
+    .rt th { padding: .28rem .55rem; font-size: .61rem; font-weight: 800; text-transform: uppercase; color: var(--muted); background: var(--s2); text-align: left; border-bottom: 1px solid var(--b1); white-space: nowrap; }
+    .rt td { padding: .36rem .55rem; border-bottom: 1px solid rgba(30,42,69,.4); font-family: var(--mono); font-size: .74rem; }
+    .rt tr.row-first td { background: rgba(251,146,60,.04); }
+    .rt tr.row-bypass td { background: rgba(248,113,113,.04); }
+    .td-pw { color: var(--red) !important; font-weight: 700; }
+    .td-role-admin { color: var(--orange); font-weight: 700; }
+    .row-badge { display: inline-flex; align-items: center; padding: .06rem .3rem; border-radius: 3px; font-size: .58rem; font-weight: 800; margin-left: .3rem; }
+    .rb-sel { background: rgba(251,146,60,.15); color: var(--orange); border: 1px solid rgba(251,146,60,.3); }
+    .rb-skip { background: rgba(100,116,139,.08); color: var(--muted); border: 1px solid var(--b1); }
+
+    /* ── Auth Result ── */
+    .auth-result { border-radius: 10px; padding: .85rem 1rem; border: 1px solid; animation: fi .35s ease; display: none; margin-bottom: .7rem; }
+    .auth-result.show { display: block; }
+    .auth-result.bypass { border-color: rgba(248,113,113,.45); background: rgba(248,113,113,.05); animation: fi .35s ease, pulse-breach 1.8s ease 1s infinite alternate; }
+    .auth-result.ok { border-color: rgba(52,211,153,.35); background: rgba(52,211,153,.04); }
+    .auth-result.fail { border-color: rgba(100,116,139,.25); background: var(--s2); }
+    @keyframes fi { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    @keyframes pulse-breach { from { box-shadow: 0 0 0 rgba(248,113,113,.2); } to { box-shadow: 0 0 20px rgba(248,113,113,.18); } }
+    .ar-title { font-weight: 900; font-size: .95rem; margin-bottom: .4rem; display: flex; align-items: center; gap: .35rem; }
+    .ar-row { display: flex; gap: .6rem; margin-bottom: .45rem; flex-wrap: wrap; }
+    .ar-field { flex: 1; min-width: 100px; padding: .4rem .6rem; border-radius: 6px; background: var(--s2); border: 1px solid var(--b1); }
+    .ar-fl { font-size: .62rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: .1rem; }
+    .ar-fv { font-family: var(--mono); font-size: .82rem; font-weight: 700; }
+    .ar-reason { font-size: .77rem; line-height: 1.55; color: var(--muted); border-left: 2px solid rgba(248,113,113,.3); padding-left: .65rem; margin-top: .45rem; }
+
+    /* ── Admin buttons ── */
+    .action-row { display: flex; flex-direction: column; gap: .4rem; margin-top: .65rem; }
+    .btn-action { display: flex; align-items: center; gap: .45rem; padding: .62rem .9rem; border-radius: 7px; border: none; cursor: pointer; font-family: var(--font); font-weight: 800; font-size: .8rem; text-decoration: none; transition: all .18s; justify-content: center; }
+    .btn-admin { background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.3); color: var(--purple2); }
+    .btn-admin:hover { background: rgba(108,99,255,.2); }
+    .btn-search { background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.25); color: var(--green); }
+    .btn-search:hover { background: rgba(52,211,153,.15); }
+
+    /* ── Explanation ── */
+    .exp-box { padding: .7rem .85rem; background: var(--s2); border: 1px solid var(--b1); border-radius: 8px; font-size: .76rem; line-height: 1.6; color: var(--muted); }
+    .exp-title { font-weight: 800; font-size: .8rem; color: var(--text); margin-bottom: .35rem; display: flex; align-items: center; gap: .35rem; }
+    .exp-point { margin: .3rem 0; padding-left: .75rem; position: relative; }
+    .exp-point::before { content: '→'; position: absolute; left: 0; color: var(--orange); font-size: .7rem; }
+
+    /* ── Modern note ── */
+    .modern-note { padding: .75rem .9rem; border-radius: 8px; border: 1px solid rgba(52,211,153,.2); background: rgba(52,211,153,.04); font-size: .77rem; line-height: 1.55; color: rgba(52,211,153,.8); display: none; }
+
+    /* ── Demo 1 sub-toggle ── */
+    .sub-toggle { display: flex; gap: .35rem; background: rgba(0,0,0,.25); border-radius: 8px; padding: .22rem; border: 1px solid rgba(255,255,255,.07); margin-bottom: .7rem; }
+    .sub-btn { flex: 1; padding: .32rem .5rem; border: none; border-radius: 6px; font-size: .72rem; font-weight: 700; cursor: pointer; font-family: var(--font); letter-spacing: .03em; background: transparent; color: var(--muted); transition: all .22s; }
+    .sub-btn.active-vuln { background: linear-gradient(135deg, rgba(248,113,113,.25), rgba(251,146,60,.2)); color: #fb923c; box-shadow: 0 2px 8px rgba(248,113,113,.2); }
+    .sub-btn.active-sec { background: linear-gradient(135deg, rgba(52,211,153,.2), rgba(34,211,238,.15)); color: var(--green); box-shadow: 0 2px 8px rgba(52,211,153,.15); }
+    .sub-btn:hover:not(.active-vuln):not(.active-sec) { background: rgba(255,255,255,.06); color: var(--text); }
+    /* comparison panel */
+    .cmp-panel { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-top: .7rem; }
+    .cmp-col { background: var(--s2); border-radius: 8px; padding: .65rem .75rem; border: 1px solid var(--b1); }
+    .cmp-col.active-side { border-color: rgba(108,99,255,.4); box-shadow: 0 0 12px rgba(108,99,255,.1); }
+    .cmp-hdr { font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; margin-bottom: .4rem; padding-bottom: .3rem; border-bottom: 1px solid var(--b1); }
+    .cmp-hdr.vuln-hdr { color: var(--red); }
+    .cmp-hdr.sec-hdr { color: var(--green); }
+    .cmp-body { font-family: var(--mono); font-size: .68rem; line-height: 1.65; white-space: pre-wrap; }
+    .cmp-inj { color: var(--red); font-weight: 700; }
+    .cmp-safe { color: var(--green); }
+    .cmp-ph { color: var(--cyan); font-weight: 700; }
+    .cmp-param { color: var(--orange); font-style: italic; }
+    .cmp-blocked { display: inline-block; background: rgba(52,211,153,.15); color: var(--green); border: 1px solid rgba(52,211,153,.3); border-radius: 4px; padding: .1rem .35rem; font-size: .62rem; font-weight: 700; margin-top: .3rem; }
+    .cmp-bypass  { display: inline-block; background: rgba(248,113,113,.15); color: var(--red); border: 1px solid rgba(248,113,113,.3); border-radius: 4px; padding: .1rem .35rem; font-size: .62rem; font-weight: 700; margin-top: .3rem; }
+
+    @media (max-width: 1200px) { .cols3 { grid-template-columns: 340px 1fr; } }
+    @media (max-width: 900px) { .cols3 { grid-template-columns: 1fr; } .demo-sel { grid-template-columns: 1fr; } .cmp-panel { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="bg-grid" aria-hidden="true"></div>
+
+<nav class="nav">
+  <div class="nav-i">
+    <a href="/" class="nav-logo">⚡ SQLi<span>Lab</span></a>
+    <ul class="nav-links">
+      <li><a href="/" class="nav-link">Home</a></li>
+      <li><a href="/register" class="nav-link">Register</a></li>
+      <li><a href="/login" class="nav-link active">Login</a></li>
+      <li><a href="/search" class="nav-link">Search</a></li>
+      <li><a href="/inspector" class="nav-link">Inspector</a></li>
+      <li><a href="/admin" class="nav-link">Admin</a></li>
+      <li><a href="/crack" class="nav-link">Password Analysis</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="page">
+  <h1 style="font-size:1.35rem;font-weight:900;margin-bottom:.2rem">Login Demo</h1>
+  <p style="color:var(--muted);font-size:.8rem;margin-bottom:.9rem">Select a scenario then interact with the form to explore the attack chain.</p>
+
+  <!-- Demo Selector -->
+  <div class="demo-sel">
+    <div class="demo-card legacy active" id="card-legacy" onclick="setDemo('legacy')">
+      <div class="dc-top">
+        <div class="dc-icon">📟</div>
+        <div class="dc-label">
+          <div class="dc-name">Demo 1 — Legacy Application</div>
+          <div class="dc-sub">Classic SQL Injection Login Bypass</div>
+        </div>
+        <div class="dc-radio"></div>
+      </div>
+      <div class="dc-tags">
+        <span class="tag t-r">Plaintext passwords</span>
+        <span class="tag t-o">Login bypass ✓</span>
+        <span class="tag t-b">No bcrypt</span>
+      </div>
+    </div>
+    <div class="demo-card modern" id="card-modern" onclick="setDemo('modern')">
+      <div class="dc-top">
+        <div class="dc-icon">🔒</div>
+        <div class="dc-label">
+          <div class="dc-name">Demo 2 — Modern Application</div>
+          <div class="dc-sub">bcrypt Auth + UNION Data Theft</div>
+        </div>
+        <div class="dc-radio"></div>
+      </div>
+      <div class="dc-tags">
+        <span class="tag t-g">bcrypt hashing</span>
+        <span class="tag t-r">Login bypass ✗</span>
+        <span class="tag t-r">UNION hash theft</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Attack Chain -->
+  <div class="attack-chain" id="attack-chain">
+    <div class="ac-step current" id="ac0">🔑 Login Form</div>
+    <div class="ac-arrow">›</div>
+    <div class="ac-step" id="ac1">💉 SQL Injection</div>
+    <div class="ac-arrow">›</div>
+    <div class="ac-step" id="ac2">⚗️ Query Modified</div>
+    <div class="ac-arrow">›</div>
+    <div class="ac-step" id="ac3">🗂️ Rows Returned</div>
+    <div class="ac-arrow">›</div>
+    <div class="ac-step" id="ac4">🔓 Auth Bypass</div>
+    <div class="ac-arrow">›</div>
+    <div class="ac-step" id="ac5">👑 Admin Session</div>
+    <div class="ac-arrow">›</div>
+    <div class="ac-step" id="ac6">💾 Download DB</div>
+  </div>
+
+  <!-- 3-col layout -->
+  <div class="cols3">
+
+    <!-- ═══ COL 1: Form + Payloads ═══ -->
+    <div>
+      <!-- Quick Payloads -->
+      <div class="card">
+        <div class="ch">
+          <div class="ct">⚡ Quick Payloads</div>
+          <span class="badge b-r" id="payload-mode-badge">Demo 1</span>
+        </div>
+        <div class="cb" style="padding:.7rem .9rem">
+          <div class="payload-section" id="injection-payloads">
+            <div class="ps-label">🔴 Injection payloads (username field)</div>
+            <div class="chips">
+              <div class="chip ch-inj" id="chip0" onclick="usePayload(0)">
+                <div class="chip-meta">' OR 1=1--</div>
+                <div class="chip-tag">All rows</div>
+              </div>
+              <div class="chip ch-inj" id="chip1" onclick="usePayload(1)">
+                <div class="chip-meta">admin' --</div>
+                <div class="chip-tag">Comment bypass</div>
+              </div>
+              <div class="chip ch-inj" id="chip2" onclick="usePayload(2)">
+                <div class="chip-meta">alice' --</div>
+                <div class="chip-tag">Target user</div>
+              </div>
+            </div>
+            <div class="ps-label" style="margin-top:.55rem">🟡 Injection payloads (password field)</div>
+            <div class="chips">
+              <div class="chip ch-inj" id="chip3" onclick="usePayload(3)">
+                <div class="chip-meta">admin + ' OR '1'='1</div>
+                <div class="chip-tag">Password bypass</div>
+              </div>
+            </div>
+          </div>
+          <div class="payload-section">
+            <div class="ps-label">🟢 Normal login</div>
+            <div class="chips">
+              <!-- Demo 1 normal logins (legacy_users, plaintext) -->
+              <div class="chip ch-ok" id="chip4" onclick="usePayload(4)">
+                <div class="chip-meta">admin / admin123</div>
+                <div class="chip-tag">Legit</div>
+              </div>
+              <div class="chip ch-ok" id="chip5" onclick="usePayload(5)">
+                <div class="chip-meta">alice / password</div>
+                <div class="chip-tag">Legit</div>
+              </div>
+              <!-- Demo 2 normal logins (users, bcrypt) — hidden in Demo 1 -->
+              <div class="chip ch-ok" id="chip6" onclick="usePayload(6)" style="display:none">
+                <div class="chip-meta">admin / admin2024</div>
+                <div class="chip-tag">bcrypt login</div>
+              </div>
+              <div class="chip ch-ok" id="chip7" onclick="usePayload(7)" style="display:none">
+                <div class="chip-meta">alice / alice99</div>
+                <div class="chip-tag">bcrypt login</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Login Form -->
+      <div class="card">
+        <div class="ch">
+          <div class="ct" id="form-title">📟 Legacy Login</div>
+          <span class="badge b-o" id="form-badge">Vulnerable</span>
+        </div>
+        <div class="cb">
+          <div class="field">
+            <label for="u-username">Username</label>
+            <input id="u-username" type="text" placeholder="e.g.  admin   or   admin' --" autocomplete="off"/>
+          </div>
+          <div class="field">
+            <label for="u-password" id="pw-label">Password (plaintext)</label>
+            <input id="u-password" type="text" placeholder="e.g.  admin123   or   ' OR '1'='1" autocomplete="off"/>
+          </div>
+          <!-- Demo 1 sub-toggle: Vulnerable vs Secure -->
+          <div id="legacy-sub-toggle" style="display:none">
+            <div class="sub-toggle">
+              <button class="sub-btn active-vuln" id="sub-vuln-btn" onclick="setLegacyMode('vulnerable')">🔴 Vulnerable Mode</button>
+              <button class="sub-btn" id="sub-sec-btn" onclick="setLegacyMode('secure')">🛡️ Secure Mode</button>
+            </div>
+            <div id="secure-hint" style="display:none;font-size:.72rem;color:var(--green);margin-bottom:.5rem;line-height:1.5">
+              🔒 <strong>Parameterised queries active.</strong>
+              The same injection payload is now passed as a literal string value — it cannot modify the SQL syntax.
+            </div>
+          </div>
+          <button class="btn-attack" id="login-btn" onclick="doLogin()">🔓 Execute Login</button>
+          <div class="modern-note" id="modern-note" style="margin-top:.65rem">
+            🛡️ <strong>SQL Injection retrieved the row — but bcrypt blocked the login.</strong><br/>
+            The injected payload modified the WHERE clause and found the user record.
+            However, <code>bcrypt.checkpw()</code> was still called on the supplied password.
+            With the wrong password, bcrypt returns <code>False</code> — access denied.<br/><br/>
+            💡 <strong>Lesson:</strong> SQL Injection in a bcrypt app exposes <em>data</em> (the account row),
+            but cannot bypass login unless the attacker also knows the real password.
+            Try the <a href="/search" style="color:var(--green);font-weight:700">Article Search</a> to see UNION injection stealing hashes directly.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ COL 2: SQL Console + Injection Flow ═══ -->
+    <div>
+      <!-- Live SQL -->
+      <div class="card">
+        <div class="ch">
+          <div class="ct">⚡ Generated SQL Query</div>
+          <div style="display:flex;align-items:center;gap:.35rem">
+            <span class="badge b-r" id="vuln-badge">Vulnerable</span>
+            <span id="row-count-badge" style="font-size:.68rem;font-family:var(--mono);color:var(--cyan)"></span>
+          </div>
+        </div>
+        <div class="cb" style="padding:.65rem .8rem">
+          <div class="sql-wrap">
+            <div class="sql-hdr">
+              <span id="sql-tab-label">Live Preview (updates as you type)</span>
+            </div>
+            <div class="sql-pre" id="sql-display"><span class="kw">SELECT</span> *
+<span class="kw">FROM</span> legacy_users
+<span class="kw">WHERE</span> username = <span class="str">''</span>
+<span class="kw">AND</span> password = <span class="str">''</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Injection Flow Breakdown -->
+      <div class="card" id="flow-card">
+        <div class="ch">
+          <div class="ct">🔬 Injection Flow Breakdown</div>
+          <span class="badge b-m" id="flow-status">Waiting</span>
+        </div>
+        <div class="cb" style="padding:.65rem .85rem">
+          <div class="flow" id="flow-steps">
+            <div class="flow-step">
+              <div class="fs-num fsn-gray">1</div>
+              <div class="fs-content">
+                <div class="fs-title">Template Query</div>
+                <div class="fs-body" style="color:var(--muted)">SELECT * FROM legacy_users
+WHERE username = '<span style="color:var(--cyan)">?</span>' AND password = '<span style="color:var(--cyan)">?</span>'</div>
+                <div class="fs-note">Both fields are directly concatenated into SQL — no escaping.</div>
+              </div>
+            </div>
+            <div class="flow-step" id="fs-input" style="display:none">
+              <div class="fs-num fsn-orange">2</div>
+              <div class="fs-content">
+                <div class="fs-title">Your Input</div>
+                <div class="fs-body" id="fs-input-body"></div>
+              </div>
+            </div>
+            <div class="flow-step" id="fs-injected" style="display:none">
+              <div class="fs-num fsn-red" id="fs-injected-num">3</div>
+              <div class="fs-content">
+                <div class="fs-title" id="fs-injected-title">After String Substitution</div>
+                <div class="fs-body" id="fs-injected-body"></div>
+                <div class="fs-note" id="fs-injected-note"></div>
+              </div>
+            </div>
+            <div class="flow-step" id="fs-dbsees" style="display:none">
+              <div class="fs-num fsn-red" id="fs-dbsees-num">4</div>
+              <div class="fs-content">
+                <div class="fs-title" id="fs-dbsees-title">What the Database Executes</div>
+                <div class="fs-body" id="fs-dbsees-body"></div>
+                <div class="fs-note" id="fs-dbsees-note"></div>
+              </div>
+            </div>
+            <div class="flow-step" id="fs-result" style="display:none">
+              <div class="fs-num fsn-green">5</div>
+              <div class="fs-content">
+                <div class="fs-title">Authentication Decision</div>
+                <div class="fs-body" id="fs-result-body"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ COL 3: Result + Rows ═══ -->
+    <div>
+      <!-- Idle state placeholder — always visible, hidden after first login -->
+      <div id="result-placeholder" class="card" style="border-style:dashed;opacity:.45">
+        <div class="cb" style="padding:1.2rem 1rem;text-align:center;color:var(--muted);font-size:.8rem">
+          🎯 Submit a login attempt to see the authentication result here.
+        </div>
+      </div>
+
+      <!-- Auth Result -->
+      <div class="auth-result" id="auth-result">
+        <div class="ar-title" id="ar-title"></div>
+        <div class="ar-row" id="ar-row"></div>
+        <div class="ar-reason" id="ar-reason"></div>
+        <div class="action-row" id="action-row" style="display:none"></div>
+      </div>
+
+      <!-- Returned Rows -->
+      <div class="card" id="rows-card" style="display:none">
+        <div class="ch">
+          <div class="ct" id="rows-title">🗂️ Rows Returned by Database</div>
+          <span class="badge" id="rows-badge">0 rows</span>
+        </div>
+        <div class="cb" style="padding:.6rem .8rem">
+          <div style="overflow-x:auto" id="rows-table-wrap"></div>
+          <div id="rows-explanation" style="margin-top:.55rem;font-size:.75rem;line-height:1.55;color:var(--muted)"></div>
+        </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+
+  // ─────────────────────────────────────────────────────────────
+  // State
+  // ─────────────────────────────────────────────────────────────
+  let currentDemo = 'legacy';
+  let legacySubMode = 'vulnerable'; // 'vulnerable' or 'secure'
+  let lastResult = null;
+  let activeChip = -1;
+
+  // Payload definitions
+  const PAYLOADS = [
+    { id: 0, username: "' OR 1=1--", password: '', field: 'u',
+      label: "' OR 1=1--",
+      kind: 'injection',
+      how: 'tautology',
+      title: 'Boolean Tautology Attack',
+      steps: [
+        { title: 'Injection Point', body: "username = '<span class=\"inj-u\">' OR 1=1--</span>'\npassword = ''", note: "Single quote closes the string early. OR 1=1 is appended." },
+        { title: 'Resulting WHERE Clause', body: "WHERE username = <span class=\"str\">''</span> <span class=\"inj-u\">OR 1=1</span><span class=\"cmt\">-- ' AND password = ''</span>", note: "-- comments out the rest. OR 1=1 is ALWAYS true for every row." },
+        { title: 'Database Decision', body: "<span class=\"inj-u\">OR 1=1</span> makes the WHERE clause TRUE for ALL rows.\nALL rows are returned. rows[0] = admin (first inserted).", note: '' },
+      ],
+      why: [
+        'The single quote <code>\'</code> breaks out of the string context SQLite expects.',
+        '<code>OR 1=1</code> is a tautology — always evaluates to TRUE.',
+        'The double-dash <code>--</code> starts a SQL comment, ignoring everything after it (including the password check).',
+        'The WHERE clause evaluates TRUE for every row — all users are returned.',
+        'The application uses <code>rows[0]</code>, which is the first user inserted: <strong>admin</strong>.',
+        'Admin session created without knowing any password.',
+      ],
+    },
+    { id: 1, username: "admin' --", password: '', field: 'u',
+      label: "admin' --",
+      kind: 'injection',
+      how: 'comment',
+      title: 'SQL Comment Truncation Attack',
+      steps: [
+        { title: 'Injection Point', body: "username = '<span class=\"inj-u\">admin' --</span>'\npassword = <span class=\"str\">''</span>", note: "Single quote closes the string. -- starts a comment." },
+        { title: 'Resulting WHERE Clause', body: "WHERE username = <span class=\"str\">'admin'</span> <span class=\"cmt\">-- ' AND password = ''</span>", note: "Everything after -- is a comment. The AND password = '' clause is never checked." },
+        { title: 'Database Decision', body: "Only checks: username = <span class=\"str\">'admin'</span>\nPassword condition is <span class=\"cmt\">ignored</span>.\n1 row returned → admin logged in.", note: '' },
+      ],
+      why: [
+        "The attacker types <code>admin'</code> — the single quote closes the SQL string.",
+        'The double-dash <code>--</code> turns the rest of the query into a comment.',
+        'SQLite never evaluates <code>AND password = \'...\'</code> — it\'s commented out.',
+        'The database only checks: does a user with username <code>admin</code> exist?',
+        'Since admin exists, 1 row is returned and login succeeds.',
+        'No password was needed at any point.',
+      ],
+    },
+    { id: 2, username: "alice' --", password: '', field: 'u',
+      label: "alice' --",
+      kind: 'injection',
+      how: 'comment',
+      title: 'Targeted User Comment Attack',
+      steps: [
+        { title: 'Injection Point', body: "username = '<span class=\"inj-u\">alice' --</span>'\npassword = <span class=\"str\">''</span>", note: "Attacker targets a specific known user." },
+        { title: 'Resulting WHERE Clause', body: "WHERE username = <span class=\"str\">'alice'</span> <span class=\"cmt\">-- ' AND password = ''</span>", note: "Password check is commented out. Only alice's existence is tested." },
+        { title: 'Database Decision', body: "username = <span class=\"str\">'alice'</span> → 1 row returned.\nLogged in as alice (without her password).", note: '' },
+      ],
+      why: [
+        'Same comment injection as admin\' -- but targeting alice.',
+        'Demonstrates that an attacker can impersonate ANY known user.',
+        'The attacker does not need to know the victim\'s password.',
+        'In the legacy app, user enumeration + comment injection = full account takeover.',
+      ],
+    },
+    { id: 3, username: 'admin', password: "' OR '1'='1", field: 'p',
+      label: "pw: ' OR '1'='1",
+      kind: 'injection',
+      how: 'pw-tautology',
+      title: 'Password Field Tautology Attack',
+      steps: [
+        { title: 'Injection Point', body: "username = <span class=\"str\">'admin'</span>\npassword = '<span class=\"inj-p\">' OR '1'='1</span>'", note: "Injection is in the PASSWORD field." },
+        { title: 'Resulting WHERE Clause', body: "WHERE username = <span class=\"str\">'admin'</span>\n  AND password = <span class=\"str\">''</span> <span class=\"inj-p\">OR '1'='1'</span>", note: "OR '1'='1' is always TRUE, overriding the AND." },
+        { title: 'Database Decision', body: "AND + OR evaluation:\n  (username='admin' AND password='')  ←false\n  OR ('1'='1')                         ←<span class=\"inj-p\">TRUE!</span>\nResult: auth succeeds.", note: '' },
+      ],
+      why: [
+        'The password field is equally vulnerable to injection as the username field.',
+        'The injected <code>\' OR \'1\'=\'1</code> evaluates to TRUE, overriding the AND clause.',
+        'SQL operator precedence: AND binds tighter than OR, so OR makes the whole expression true.',
+        'Both username AND password fields must be protected with parameterised queries.',
+        'This demonstrates that even "knowing the username" doesn\'t make a field safe to concatenate.',
+      ],
+    },
+    { id: 4, username: 'admin', password: 'admin123', field: null,
+      label: 'admin / admin123',
+      kind: 'normal',
+      how: 'normal',
+      title: 'Normal Authentication (Demo 1)',
+      steps: [],
+      why: [
+        'The username and password are both embedded as literal strings.',
+        "WHERE username = 'admin' AND password = 'admin123'",
+        'SQLite checks whether a row with these exact values exists in legacy_users.',
+        'In Demo 1, passwords are stored in PLAINTEXT, so this is a direct string match.',
+        'Because admin/admin123 is a valid account, 1 row is returned and login succeeds.',
+        'There is no SQL injection here — but notice the password is visible in the SQL string.',
+      ],
+    },
+    { id: 5, username: 'alice', password: 'password', field: null,
+      label: 'alice / password',
+      kind: 'normal',
+      how: 'normal',
+      title: 'Normal Authentication — Student Account (Demo 1)',
+      steps: [],
+      why: [
+        "Username 'alice' + password 'password' matches the alice row in legacy_users.",
+        'Both are embedded as-is into the SQL string.',
+        'Plaintext comparison: the database checks column values directly.',
+        'The password itself is visible in the SQL — a major risk if query logs are exposed.',
+      ],
+    },
+    { id: 6, username: 'admin', password: 'admin2024', field: null,
+      label: 'admin / admin2024',
+      kind: 'normal',
+      how: 'normal',
+      title: 'Normal Authentication (Demo 2 — bcrypt)',
+      steps: [],
+      why: [
+        'Demo 2 uses the modern users table where passwords are stored as bcrypt hashes.',
+        "Step 1 — SQL: SELECT * FROM users WHERE username = 'admin'",
+        'The password is NOT part of the SQL query. bcrypt.checkpw() is called in Python.',
+        "Step 2 — bcrypt.checkpw('admin2024', stored_hash) → True",
+        'Login succeeds because the supplied password matches the stored bcrypt hash.',
+        'Notice: the SQL query only filters by username. Password verification is in application code.',
+      ],
+    },
+    { id: 7, username: 'alice', password: 'alice99', field: null,
+      label: 'alice / alice99',
+      kind: 'normal',
+      how: 'normal',
+      title: 'Normal Authentication — Student Account (Demo 2 — bcrypt)',
+      steps: [],
+      why: [
+        'alice is a student account in the modern users table with a bcrypt-hashed password.',
+        "Step 1 — SQL: SELECT * FROM users WHERE username = 'alice'",
+        "Step 2 — bcrypt.checkpw('alice99', stored_hash) → True",
+        'Login succeeds. Role is \'student\' so no admin buttons appear.',
+        'This demonstrates that bcrypt authentication works correctly for normal logins.',
+      ],
+    },
+  ];
+
+  // ─────────────────────────────────────────────────────────────
+  // Demo switch — defined after all functions to avoid hoisting bug
+  // ─────────────────────────────────────────────────────────────
+
+  window.setDemo = function (demo) {
+    currentDemo = demo;
+    $('card-legacy').className = 'demo-card legacy' + (demo === 'legacy' ? ' active' : '');
+    $('card-modern').className = 'demo-card modern' + (demo === 'modern' ? ' active' : '');
+    clearAll();
+    if (demo === 'legacy') {
+      $('form-title').textContent = '📟 Legacy Login';
+      $('form-badge').textContent = 'Vulnerable'; $('form-badge').className = 'badge b-o';
+      $('pw-label').textContent = 'Password (plaintext)';
+      $('u-password').placeholder = 'e.g.  admin123  or  \' OR \'1\'=\'1';
+      $('login-btn').className = 'btn-attack'; $('login-btn').textContent = '🔓 Execute Login';
+      $('payload-mode-badge').textContent = 'Demo 1';
+      $('vuln-badge').textContent = 'Vulnerable'; $('vuln-badge').className = 'badge b-r';
+      $('injection-payloads').style.display = '';
+      $('modern-note').style.display = 'none';
+      $('legacy-sub-toggle').style.display = '';
+      legacySubMode = 'vulnerable';
+      $('sub-vuln-btn').className = 'sub-btn active-vuln';
+      $('sub-sec-btn').className = 'sub-btn';
+      $('secure-hint').style.display = 'none';
+      // Normal login chips: show Demo 1 (plaintext), hide Demo 2 (bcrypt)
+      ['chip4','chip5'].forEach(id => { const c=$(id); if(c) c.style.display=''; });
+      ['chip6','chip7'].forEach(id => { const c=$(id); if(c) c.style.display='none'; });
+      resetChain('legacy');
+      resetFlow();
+      updateLiveSql();
+    } else {
+      $('legacy-sub-toggle').style.display = 'none';
+      $('form-title').textContent = '🔒 Modern Login';
+      $('form-badge').textContent = 'Secure'; $('form-badge').className = 'badge b-g';
+      $('pw-label').textContent = 'Password (bcrypt.checkpw)';
+      $('u-password').placeholder = 'any password — bcrypt verifies after SQL lookup';
+      $('login-btn').className = 'btn-attack btn-modern'; $('login-btn').textContent = '🔒 Attempt Login';
+      $('payload-mode-badge').textContent = 'Demo 2';
+      $('vuln-badge').textContent = 'Secure'; $('vuln-badge').className = 'badge b-g';
+      $('injection-payloads').style.display = 'none';
+      // Normal login chips: hide Demo 1 (plaintext), show Demo 2 (bcrypt)
+      ['chip4','chip5'].forEach(id => { const c=$(id); if(c) c.style.display='none'; });
+      ['chip6','chip7'].forEach(id => { const c=$(id); if(c) c.style.display=''; });
+      resetChain('modern');
+      resetFlow('modern');
+      updateLiveSql();
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  // Demo 1 sub-mode toggle (Vulnerable ↔ Secure)
+  // ─────────────────────────────────────────────────────────────
+  window.setLegacyMode = function (mode) {
+    legacySubMode = mode;
+    const isSecure = mode === 'secure';
+    $('sub-vuln-btn').className = 'sub-btn' + (isSecure ? '' : ' active-vuln');
+    $('sub-sec-btn').className  = 'sub-btn' + (isSecure ? ' active-sec' : '');
+    $('secure-hint').style.display = isSecure ? '' : 'none';
+    $('form-badge').textContent = isSecure ? 'Secure (parameterised)' : 'Vulnerable';
+    $('form-badge').className  = isSecure ? 'badge b-g' : 'badge b-o';
+    $('vuln-badge').textContent = isSecure ? 'Secure (? placeholders)' : 'Vulnerable';
+    $('vuln-badge').className  = isSecure ? 'badge b-g' : 'badge b-r';
+    $('login-btn').textContent = isSecure ? '\uD83D\uDEE1\uFE0F Test Secure Query' : '\uD83D\uDD13 Execute Login';
+    // Flip flow card title and step 1 description
+    $('flow-card').querySelector('.ct').textContent = isSecure
+      ? '\uD83D\uDEE1\uFE0F Parameterised Query Flow'
+      : '\uD83D\uDD2C Injection Flow Breakdown';
+    $('flow-steps').querySelector('.fs-title').textContent = isSecure
+      ? 'SQL Template (? placeholders)'
+      : 'Template Query';
+    $('flow-steps').querySelector('.fs-note').textContent = isSecure
+      ? 'The application sends this template to the DB driver. The ? values are filled in separately — never parsed as SQL.'
+      : 'Both fields are directly concatenated into SQL — no escaping.';
+    clearAll();
+    updateLiveSql();
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  // Payload selection
+  // ─────────────────────────────────────────────────────────────
+  window.usePayload = function (id) {
+    const p = PAYLOADS[id];
+    [0,1,2,3,4,5,6,7].forEach(i => {
+      const c = $('chip' + i);
+      if (c) c.classList.remove('selected');
+    });
+    const c = $('chip' + id);
+    if (c) c.classList.add('selected');
+    activeChip = id;
+
+    if (p.field === 'u') {
+      $('u-username').value = p.username;
+      $('u-password').value = p.password;
+    } else if (p.field === 'p') {
+      $('u-username').value = p.username;
+      $('u-password').value = p.password;
+    } else {
+      $('u-username').value = p.username;
+      $('u-password').value = p.password;
+    }
+
+    highlightInputs(p);
+    updateLiveSql();
+    showFlowPreview(p);
+    advanceChain(p.kind === 'injection' ? 1 : 0);
+  };
+
+  function highlightInputs(p) {
+    $('u-username').className = p.kind === 'injection' && p.field !== 'p' ? 'injecting' : '';
+    $('u-password').className = p.kind === 'injection' && p.field === 'p' ? 'injecting' : '';
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Live SQL preview
+  // ─────────────────────────────────────────────────────────────
+  ['u-username', 'u-password'].forEach(id => {
+    $(id).addEventListener('input', () => {
+      updateLiveSql();
+      if (activeChip < 0) {
+        updateFlowFromInputs();
+      }
+    });
+  });
+
+  function updateLiveSql() {
+    const u = $('u-username').value;
+    const p = $('u-password').value;
+    if (currentDemo === 'legacy' && legacySubMode === 'vulnerable') {
+      const raw = `SELECT *\nFROM legacy_users\nWHERE username = '${u}'\nAND password = '${p}'`;
+      $('sql-display').innerHTML = highlightLegacy(u, p, raw);
+    } else if (currentDemo === 'legacy' && legacySubMode === 'secure') {
+      const uE = esc(u); const pE = esc(p);
+      const raw = `-- Parameterised query:\nSELECT *\nFROM legacy_users\nWHERE username = ?\nAND password = ?\n\n-- Bound parameters (driver escapes these as data):\nparams = (${JSON.stringify(u)}, ${JSON.stringify(p)})`;
+      $('sql-display').innerHTML = hlSecureLegacy(u, p, raw);
+    } else {
+      const raw = `-- Step 1: Username-only lookup (parameterised)\nSELECT * FROM users\nWHERE username = '${esc(u)}'\n\n-- Step 2: Python (after SQL returns row)\nbcrypt.checkpw('${esc(p)}', stored_hash)`;
+      $('sql-display').innerHTML = hlBasic(raw);
+    }
+  }
+
+  function highlightLegacy(u, p, raw) {
+    // Detect injection chars in username and password
+    const uHasInj = /['";#\-\-]|OR|AND|UNION/i.test(u);
+    const pHasInj = /['";#\-\-]|OR|AND|UNION/i.test(p);
+
+    let out = `<span class="kw">SELECT</span> *\n<span class="kw">FROM</span> legacy_users\n<span class="kw">WHERE</span> username = '`;
+    if (uHasInj) {
+      out += renderInjectedUsername(u);
+    } else {
+      out += `<span class="str">${esc(u)}</span>`;
+    }
+    out += `'\n<span class="kw">AND</span> password = '`;
+    if (pHasInj) {
+      out += `<span class="inj-p">${esc(p)}</span>`;
+    } else {
+      out += `<span class="str">${esc(p)}</span>`;
+    }
+    out += `'`;
+    return out;
+  }
+
+  function renderInjectedUsername(u) {
+    // Highlight single quote, OR 1=1, --, etc.
+    let h = esc(u);
+    h = h.replace(/(--[^\n]*)/g, '<span class="cmt">$1</span>');
+    h = h.replace(/\bOR\b/gi, '<span class="inj-u">OR</span>');
+    h = h.replace(/1=1/g, '<span class="inj-u">1=1</span>');
+    h = h.replace(/&#39;/g, '<span class="inj-u">\'</span>');
+    return `<span class="inj-u">${h}</span>`;
+  }
+
+  function hlBasic(sql) {
+    const kws = ['SELECT', 'FROM', 'WHERE', 'AND', 'OR'];
+    let out = sql.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    out = out.replace(/(--[^\n]*)/g, '<span class="cmt">$1</span>');
+    out = out.replace(/'([^']*)'/g, "<span class=\"str\">'$1'</span>");
+    kws.forEach(k => { out = out.replace(new RegExp(`\\b${k}\\b`, 'g'), `<span class="kw">${k}</span>`); });
+    return out;
+  }
+
+  function hlSecureLegacy(u, p, raw) {
+    // Highlight the parameterised form: ? placeholders in cyan, bound values in orange
+    let out = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Only highlight lines that START with -- (real SQL comment lines in the display)
+    // Do NOT match inline -- inside quoted values like params = ("admin' --", "")
+    out = out.replace(/(^--[^\n]*)/gm, '<span class="cmt">$1</span>');
+    // SQL keywords
+    ['SELECT','FROM','WHERE','AND'].forEach(k => {
+      out = out.replace(new RegExp(`\\b${k}\\b`, 'g'), `<span class="kw">${k}</span>`);
+    });
+    // ? placeholders
+    out = out.replace(/\?/g, '<span class="cmp-ph">?</span>');
+    // params line — highlight bound values in orange
+    out = out.replace(/params = \((.+)\)/, (_, inner) => {
+      const hi = inner.replace(/"([^"]*)"/g, '<span class="cmp-param">"$1"</span>');
+      return `params = (${hi})`;
+    });
+    return out;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Injection flow (preview, before submit)
+  // ─────────────────────────────────────────────────────────────
+  function showFlowPreview(p) {
+    const isSecure = legacySubMode === 'secure';
+
+    if (isSecure) {
+      // ── Secure mode: parameterised query flow ──────────────────
+      $('flow-status').textContent = p.kind === 'injection' ? 'Injection Detected (blocked)' : 'Normal';
+      $('flow-status').className = 'badge ' + (p.kind === 'injection' ? 'b-g' : 'b-g');
+
+      $('fs-input').style.display = '';
+      $('fs-input-body').innerHTML = `username: <span class="str">${esc(p.username) || '(empty)'}</span>\npassword: <span class="str">${esc(p.password) || '(empty)'}</span>`;
+
+      // Step 3 — Bound Parameters
+      $('fs-injected-title').textContent = 'Bound Parameters';
+      $('fs-injected-num').textContent = '3';
+      $('fs-injected-num').className = 'fs-num fsn-gray';
+      $('fs-injected').style.display = '';
+      $('fs-injected-body').innerHTML = `params = (<span class="cmp-param">${esc(p.username)}</span>, <span class="cmp-param">${esc(p.password)}</span>)\n\nPassed to the DB driver as opaque data — never parsed as SQL.`;
+      $('fs-injected-note').textContent = 'Even if the value contains \' or --, the driver treats it as a plain string.';
+
+      // Step 4 — DB Interpretation
+      $('fs-dbsees-title').textContent = 'Database Interpretation';
+      $('fs-dbsees-num').textContent = '4';
+      $('fs-dbsees-num').className = 'fs-num fsn-gray';
+      $('fs-dbsees').style.display = '';
+      const uNote = esc(p.username);
+      const hasSpecial = /['"`;]|--/.test(p.username);
+      $('fs-dbsees-body').innerHTML = `The DB searches for a row where:\n  username = <span class="cmp-param">${uNote}</span>\n  AND password = <span class="cmp-param">${esc(p.password)}</span>\n\n<span style="color:var(--green);font-size:.7rem">${hasSpecial ? `Note: special characters in the value (including --) are treated as part of the literal string, not as SQL syntax. No SQL comment is created. No query is modified.` : 'The payload is data only. No SQL syntax is executed.'}</span>`;
+      $('fs-dbsees-note').textContent = '';
+
+      $('fs-result').style.display = '';
+      $('fs-result-body').innerHTML = p.kind === 'injection'
+        ? `<span class="cmp-blocked">0 rows returned</span>\nNo account with username = ${esc(p.username) || '(empty)'}\nAuthentication denied.`
+        : `<span class="cmp-safe">${p.username ? '1 row returned' : '0 rows returned'}</span>\nNormal authentication.`;
+
+    } else {
+      // ── Vulnerable mode: original injection flow ───────────────
+      $('flow-status').textContent = p.kind === 'injection' ? 'Injecting' : 'Normal';
+      $('flow-status').className = 'badge ' + (p.kind === 'injection' ? 'b-r' : 'b-g');
+
+      $('fs-input').style.display = '';
+      $('fs-input-body').innerHTML = `username: <span class="${p.field !== 'p' && p.kind === 'injection' ? 'inj-u' : 'str'}">${esc(p.username) || '(empty)'}</span>\npassword: <span class="${p.field === 'p' ? 'inj-p' : 'str'}">${esc(p.password) || '(empty)'}</span>`;
+
+      // Reset step titles to vulnerable-mode labels
+      $('fs-injected-title').textContent = 'After String Substitution';
+      $('fs-injected-num').className = 'fs-num fsn-red';
+      $('fs-dbsees-title').textContent = 'What the Database Executes';
+      $('fs-dbsees-num').className = 'fs-num fsn-red';
+
+      if (p.steps.length > 0) {
+        $('fs-injected').style.display = '';
+        $('fs-injected-body').innerHTML = p.steps[0] ? p.steps[0].body : '';
+        $('fs-injected-note').textContent = p.steps[0] ? p.steps[0].note : '';
+
+        $('fs-dbsees').style.display = '';
+        $('fs-dbsees-body').innerHTML = p.steps[1] ? p.steps[1].body : '';
+        $('fs-dbsees-note').textContent = p.steps[1] ? p.steps[1].note : '';
+
+        $('fs-result').style.display = '';
+        $('fs-result-body').innerHTML = p.steps[2] ? p.steps[2].body : '';
+      } else {
+        // Normal login
+        $('fs-injected').style.display = '';
+        $('fs-injected-body').innerHTML = `WHERE username = <span class="str">'${esc(p.username)}'</span>\nAND password = <span class="str">'${esc(p.password)}'</span>`;
+        $('fs-injected-note').textContent = 'No SQL metacharacters — input is treated as a literal string.';
+        $('fs-dbsees').style.display = '';
+        $('fs-dbsees-body').innerHTML = `Both username and password values match a row.\n1 row returned → normal login.`;
+        $('fs-dbsees-note').textContent = '';
+        $('fs-result').style.display = 'none';
+      }
+    }
+  }
+
+  function updateFlowFromInputs() {
+    const u = $('u-username').value;
+    const p = $('u-password').value;
+    if (!u && !p) { resetFlow(); return; }
+    const hasInj = /['";]|--|\bOR\b|\bAND\b|\bUNION\b/i.test(u + p);
+
+    // ── Demo 2 (modern): always parameterised, 3-step bcrypt flow ─
+    if (currentDemo === 'modern') {
+      $('flow-status').textContent = hasInj ? 'Injection Detected (blocked)' : 'Normal Input';
+      $('flow-status').className = 'badge b-g';
+
+      $('fs-input').style.display = '';
+      $('fs-input-body').innerHTML =
+        `username: <span class="${hasInj ? 'inj-u' : 'str'}">${esc(u) || '(empty)'}</span>\n`
+        + `password: <span class="str">${esc(p) || '(empty)'}</span>`;
+      $('fs-input-note') && ($('fs-input-note').textContent = hasInj
+        ? 'Injection chars detected — treated as literal data in parameterised query.'
+        : '');
+
+      $('fs-injected-title').textContent = 'SQL Lookup (Step 1)';
+      $('fs-injected-num').textContent = '2';
+      $('fs-injected-num').className = 'fs-num fsn-gray';
+      $('fs-injected').style.display = '';
+      $('fs-injected-body').innerHTML =
+        `<span class="kw">SELECT</span> * <span class="kw">FROM</span> users\n`
+        + `<span class="kw">WHERE</span> username = <span class="cmp-ph">?</span>\n\n`
+        + `<span class="cmt">-- param bound as data: </span>`
+        + `<span class="cmp-param">${esc(u)}</span>\n`
+        + (hasInj
+          ? `<span style="color:var(--green);font-size:.7rem">Injection chars are inert inside ?\nNo SQL rewriting — no comment — no bypass.</span>`
+          : `<span style="color:var(--muted);font-size:.7rem">Password is NOT part of the SQL query.</span>`);
+      $('fs-injected-note').textContent = '';
+
+      $('fs-dbsees-title').textContent = 'bcrypt.checkpw() (Step 2)';
+      $('fs-dbsees-num').textContent = '3';
+      $('fs-dbsees-num').className = 'fs-num fsn-gray';
+      $('fs-dbsees').style.display = '';
+      $('fs-dbsees-body').innerHTML =
+        `bcrypt.checkpw(<span class="cmp-param">'${esc(p)}'</span>, stored_hash)\n\n`
+        + `<span style="color:var(--muted);font-size:.7rem">`
+        + `Called in Python after SQL returns a row.\n`
+        + `Returns True only if the plaintext matches the stored hash.\n`
+        + `Even if SQL injection returns a row, this step still runs —\n`
+        + `and will return False unless the real password is supplied.</span>`;
+      $('fs-dbsees-note').textContent = '';
+
+      $('fs-result').style.display = 'none'; // shown after login completes
+      return;
+    }
+
+    if (legacySubMode === 'secure') {
+      // Secure mode: show parameterised form regardless of injection chars
+      $('flow-status').textContent = hasInj ? 'Injection Detected (blocked by ?)' : 'Normal Input';
+      $('flow-status').className = 'badge b-g'; // always green — we're safe
+
+      $('fs-input').style.display = '';
+      $('fs-input-body').innerHTML = `username: <span class="str">${esc(u) || '(empty)'}</span>\npassword: <span class="str">${esc(p) || '(empty)'}</span>`;
+
+      $('fs-injected-title').textContent = 'Bound Parameters';
+      $('fs-injected-num').className = 'fs-num fsn-gray';
+      $('fs-injected').style.display = '';
+      $('fs-injected-body').innerHTML = `params = (<span class="cmp-param">${esc(u)}</span>, <span class="cmp-param">${esc(p)}</span>)\n\nThe DB driver receives these as opaque data values.\nNo SQL parsing occurs on this input.`;
+      $('fs-injected-note').textContent = hasInj
+        ? 'Special characters detected — but they are inert inside ? parameters.'
+        : 'No special characters.';
+
+      $('fs-dbsees-title').textContent = 'Database Interpretation';
+      $('fs-dbsees-num').className = 'fs-num fsn-gray';
+      $('fs-dbsees').style.display = '';
+      $('fs-dbsees-body').innerHTML = hasInj
+        ? `The DB searches literally for:\n  username = <span class="cmp-param">${esc(u)}</span>\n  AND password = <span class="cmp-param">${esc(p)}</span>\n\n<span style="color:var(--green);font-size:.7rem">Special characters (including -- and ') are part of the literal string value. They are not interpreted as SQL syntax. No SQL comment is created. No query is modified.</span>`
+        : `Exact match lookup:\n  username = <span class="str">'${esc(u)}'</span>\n  AND password = <span class="str">'${esc(p)}'</span>`;
+      $('fs-dbsees-note').textContent = '';
+      $('fs-result').style.display = 'none';
+
+    } else {
+      // Vulnerable mode: show string interpolation
+      $('flow-status').textContent = hasInj ? 'Injection Detected' : 'Normal Input';
+      $('flow-status').className = 'badge ' + (hasInj ? 'b-r' : 'b-g');
+
+      $('fs-input').style.display = '';
+      $('fs-input-body').innerHTML = `username: <span class="${/['";]|--|\bOR\b/i.test(u) ? 'inj-u' : 'str'}">${esc(u) || '(empty)'}</span>\npassword: <span class="${/['";]|--|\bOR\b/i.test(p) ? 'inj-p' : 'str'}">${esc(p) || '(empty)'}</span>`;
+
+      $('fs-injected-title').textContent = 'After String Substitution';
+      $('fs-injected-num').className = 'fs-num fsn-red';
+      $('fs-injected').style.display = '';
+      $('fs-injected-body').innerHTML = `WHERE username = '<span class="${/['"]|--|\bOR\b/i.test(u) ? 'inj-u' : 'str'}">${esc(u)}</span>'\nAND password = '<span class="${/['"]|--|\bOR\b/i.test(p) ? 'inj-p' : 'str'}">${esc(p)}</span>'`;
+      $('fs-injected-note').textContent = hasInj ? 'Potential injection metacharacters detected.' : 'Input looks safe — no special characters.';
+      $('fs-dbsees').style.display = 'none';
+      $('fs-result').style.display = 'none';
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Attack chain progress
+  // ─────────────────────────────────────────────────────────────
+  function resetChain(demo) {
+    for (let i = 0; i <= 6; i++) {
+      const el = $('ac' + i);
+      el.className = 'ac-step';
+    }
+    $('ac0').className = 'ac-step current';
+    if (demo === 'modern') {
+      $('ac2').textContent = '❌ Bypass Fails';
+      $('ac3').textContent = '🔍 UNION Search';
+      $('ac4').textContent = '🧬 Hash Exposed';
+    } else {
+      $('ac2').textContent = '⚗️ Query Modified';
+      $('ac3').textContent = '🗂️ Rows Returned';
+      $('ac4').textContent = '🔓 Auth Bypass';
+    }
+  }
+
+  function advanceChain(upTo) {
+    for (let i = 0; i <= 6; i++) {
+      const el = $('ac' + i);
+      if (i < upTo) el.className = 'ac-step done';
+      else if (i === upTo) el.className = 'ac-step current';
+      else el.className = 'ac-step';
+    }
+  }
+
+  function markChainDone(upTo) {
+    for (let i = 0; i <= 6; i++) {
+      const el = $('ac' + i);
+      if (i <= upTo) el.className = 'ac-step done';
+      else el.className = 'ac-step';
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Reset helpers
+  // ─────────────────────────────────────────────────────────────
+  function clearAll() {
+    $('auth-result').className = 'auth-result';
+    $('rows-card').style.display = 'none';
+    $('modern-note').style.display = 'none';
+    $('row-count-badge').textContent = '';
+    $('sql-tab-label').textContent = 'Live Preview (updates as you type)';
+    $('u-username').value = '';
+    $('u-password').value = '';
+    $('u-username').className = '';
+    $('u-password').className = '';
+    activeChip = -1;
+    [0,1,2,3,4,5,6,7].forEach(i => { const c = $('chip'+i); if(c) c.classList.remove('selected'); });
+    // Reset action-row completely so buttons never accumulate across logins.
+    const ar = $('action-row');
+    ar.innerHTML = '';
+    ar.style.display = 'none';
+    const ph = $('result-placeholder');
+    if (ph) ph.style.display = '';
+    resetFlow();
+    updateLiveSql();
+  }
+
+  function resetFlow(mode) {
+    $('flow-status').textContent = 'Waiting'; $('flow-status').className = 'badge b-m';
+    $('fs-input').style.display = 'none';
+    $('fs-injected').style.display = 'none';
+    $('fs-dbsees').style.display = 'none';
+    $('fs-result').style.display = 'none';
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Execute login
+  // ─────────────────────────────────────────────────────────────
+  window.doLogin = async function () {
+    const username = $('u-username').value;
+    const password = $('u-password').value;
+    if (!username && !password) { $('u-username').focus(); return; }
+
+    const btn = $('login-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin"></span>Executing…';
+    $('auth-result').className = 'auth-result';
+    $('rows-card').style.display = 'none';
+    $('modern-note').style.display = 'none';
+
+    const endpoint = currentDemo === 'legacy'
+      ? (legacySubMode === 'secure'
+          ? '/api/auth/login/legacy/secure'
+          : '/api/auth/login/legacy')
+      : '/api/auth/login/vulnerable';
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      lastResult = data;
+      renderResult(data);
+    } catch (e) {
+      console.error('Login error:', e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = currentDemo === 'legacy' ? '🔓 Execute Login' : '🔒 Attempt Login';
+    }
+  };
+
+  function renderResult(data) {
+    // Hide idle placeholder — result is now available.
+    const ph = $('result-placeholder');
+    if (ph) ph.style.display = 'none';
+
+    try {
+      _renderResultInner(data);
+    } catch (err) {
+      // Surface any runtime error visibly so it's not silently swallowed.
+      const ar = $('auth-result');
+      ar.className = 'auth-result show fail';
+      $('ar-title').textContent = '⚠️ Render Error (JS)';
+      $('ar-row').textContent = '';
+      $('ar-reason').textContent = err.message + '\n' + (err.stack || '');
+      console.error('renderResult threw:', err);
+    }
+  }
+
+  function _renderResultInner(data) {
+    // Update SQL panel
+    const u = $('u-username').value;
+    const p_pw = $('u-password').value;
+    if (currentDemo === 'modern') {
+      // Demo 2: show SQL step + bcrypt step together in the query panel
+      const bCalled = data.bcrypt_check_called;
+      const bResult = data.bcrypt_check_result;
+      const bcryptLine = bCalled
+        ? `bcrypt.checkpw(<span class="cmp-param">'${esc(p_pw)}'</span>, stored_hash)  →  `
+          + `<span style="color:${bResult ? 'var(--green)' : 'var(--red)'};font-weight:700">`
+          + `${bResult ? 'True ✅' : 'False ❌'}</span>`
+        : `<span class="cmt">-- bcrypt.checkpw() not called (0 rows returned)</span>`;
+      $('sql-display').innerHTML =
+          `<span class="cmt">-- Step 1: username lookup (parameterised)</span>\n`
+        + hlBasic(data.generated_query || '')
+        + `\n\n<span class="cmt">-- Step 2: password verification in Python</span>\n`
+        + bcryptLine;
+    } else {
+      $('sql-display').innerHTML = hlBasic(data.generated_query || '');
+    }
+    $('sql-tab-label').textContent = 'Executed Query';
+    const rc = data.rows_returned || 0;
+    $('row-count-badge').textContent = `${rc} row(s) returned`;
+
+    const rows = data.all_matched_users || [];
+    const isInjection = data.is_injection;
+    const isSuccess = data.success;
+
+    // Flow step 5: result
+    $('fs-result').style.display = '';
+    if (currentDemo === 'legacy') {
+      $('fs-result-body').textContent = isSuccess
+        ? `✅ ${rc} row(s) returned → rows[0] selected → Auth succeeds\nLogged in as: ${data.username} (${data.role})`
+        : `❌ ${rc} row(s) returned → Auth fails`;
+    } else {
+      // Demo 2: always render all 3 steps as structured HTML
+      const bCalled  = data.bcrypt_check_called;
+      const bResult  = data.bcrypt_check_result;
+
+      const step1Color = (isInjection && rc > 0) ? 'var(--orange)' : 'var(--cyan)';
+      const step1Label = isInjection && rc > 0
+        ? `${rc} row(s) returned — injection modified WHERE clause`
+        : `${rc} row(s) returned`;
+
+      let step2HTML;
+      if (bCalled) {
+        const ok = bResult === true;
+        step2HTML = `<span style="color:${ok ? 'var(--green)' : 'var(--red)'};font-weight:700">`
+          + `bcrypt.checkpw() → ${ok ? 'TRUE ✅' : 'FALSE ❌'}`
+          + `</span>`;
+      } else {
+        step2HTML = `<span style="color:var(--muted)">bcrypt.checkpw() — not called (no row found)</span>`;
+      }
+
+      const step3Color  = isSuccess ? 'var(--green)' : 'var(--red)';
+      const step3Label  = isSuccess
+        ? `Auth GRANTED — logged in as ${data.username} (${data.role})`
+        : 'Auth DENIED';
+
+      $('fs-result-body').innerHTML =
+        `<span style="color:var(--muted);font-size:.65rem">STEP 1 — SQL</span>\n`
+        + `<span style="color:${step1Color}">${step1Label}</span>\n\n`
+        + `<span style="color:var(--muted);font-size:.65rem">STEP 2 — PYTHON</span>\n`
+        + `${step2HTML}\n\n`
+        + `<span style="color:var(--muted);font-size:.65rem">STEP 3 — DECISION</span>\n`
+        + `<span style="color:${step3Color};font-weight:700">${step3Label}</span>`;
+    }
+
+    // Attack chain
+    if (currentDemo === 'legacy') {
+      if (isSuccess && isInjection) { markChainDone(6); }
+      else if (isSuccess)            { markChainDone(5); }
+      else if (isInjection)          { advanceChain(2); }
+      else                           { advanceChain(0); }
+    } else {
+      // Demo 2: injection may expose the row but auth depends on bcrypt
+      if (isInjection && rc > 0)    { advanceChain(3); } // partial: row found
+      else if (isInjection)         { advanceChain(2); }
+      else if (isSuccess)           { markChainDone(5); }
+      else                          { advanceChain(0); }
+    }
+
+    // Rows table
+    renderRowsTable(rows, isInjection, rc);
+
+    // Auth result panel
+    const ar = $('auth-result');
+
+    if (currentDemo === 'legacy' && legacySubMode === 'secure') {
+      // ─── Demo 1B: Secure Mode — parameterised queries ────────────────
+      const u = $('u-username').value;
+      const p = $('u-password').value;
+      const vulnQuery = `SELECT *\nFROM legacy_users\nWHERE username = '${esc(u)}'\nAND password = '${esc(p)}'`;
+
+      if (isInjection && !isSuccess) {
+        ar.className = 'auth-result show fail';
+        $('ar-title').innerHTML = '🛡️ Injection Blocked — Parameterised Query Protected the App';
+        $('ar-row').innerHTML = `
+          <div class="ar-field" style="flex:100%"><div class="ar-fl" style="color:var(--green)">Query Structure</div><div class="ar-fv" style="color:var(--green)">Parameterised — ? placeholder, payload bound as data</div></div>
+          <div class="ar-field"><div class="ar-fl">Rows Returned</div><div class="ar-fv" style="color:var(--muted)">0</div></div>
+          <div class="ar-field" style="flex:100%"><div class="ar-fl" style="color:var(--green)">Auth</div><div class="ar-fv" style="color:var(--green)">DENIED — no fabricated bypass</div></div>`;
+        $('ar-reason').textContent = `The payload "${u}" was passed as a literal string to the database driver. The DB searched for a user with that exact username. No such account exists → 0 rows → auth fails. The SQL WHERE clause was never modified.`;
+        $('action-row').style.display = '';
+        $('action-row').innerHTML = `<button class="btn-action btn-search" onclick="setLegacyMode('vulnerable')">🔴 Switch to Vulnerable Mode — see the bypass</button>`;
+
+      } else if (isSuccess) {
+        ar.className = 'auth-result show ok';
+        $('ar-title').innerHTML = '✅ Login Successful (Secure Mode)';
+        $('ar-row').innerHTML = `
+          <div class="ar-field"><div class="ar-fl">Username</div><div class="ar-fv" style="color:var(--green)">${esc(data.username)}</div></div>
+          <div class="ar-field"><div class="ar-fl">Role</div><div class="ar-fv" style="color:var(--cyan)">${esc(data.role)}</div></div>
+          <div class="ar-field" style="flex:100%"><div class="ar-fl">Method</div><div class="ar-fv" style="color:var(--green)">Parameterised query — exact match on username + plaintext password</div></div>`;
+        $('ar-reason').textContent = 'Valid credentials supplied. Parameterised query found exactly 1 row. Normal authentication — no injection bypass possible.';
+        showAdminButtons(data);
+
+      } else {
+        ar.className = 'auth-result show fail';
+        $('ar-title').innerHTML = '❌ Authentication Failed (Secure Mode)';
+        $('ar-row').innerHTML = `
+          <div class="ar-field"><div class="ar-fl">Rows Returned</div><div class="ar-fv">${rc}</div></div>
+          <div class="ar-field" style="flex:100%"><div class="ar-fl">Reason</div><div class="ar-fv" style="color:var(--muted)">No exact username + password match in legacy_users</div></div>`;
+        $('ar-reason').textContent = '0 rows returned. Wrong credentials.';
+        $('action-row').style.display = 'none';
+      }
+
+    } else if (currentDemo === 'legacy') {
+      // ─── Demo 1A: Vulnerable Mode — plaintext, true bypass possible ──────
+      if (isSuccess && isInjection) {
+        ar.className = 'auth-result show bypass';
+        $('ar-title').innerHTML = '☠️ Authentication Bypassed! (Legacy)';
+        $('ar-row').innerHTML = `
+          <div class="ar-field"><div class="ar-fl">Session User</div><div class="ar-fv" style="color:var(--orange)">${esc(data.username)}</div></div>
+          <div class="ar-field"><div class="ar-fl">Role</div><div class="ar-fv" style="color:var(--red)">${esc(data.role)}</div></div>
+          <div class="ar-field"><div class="ar-fl">Rows Returned</div><div class="ar-fv" style="color:var(--cyan)">${rc}</div></div>
+          <div class="ar-field"><div class="ar-fl">bcrypt Used?</div><div class="ar-fv" style="color:var(--red)">❌ No — legacy app</div></div>`;
+        $('ar-reason').textContent = getBypassReason(data.generated_query);
+        showAdminButtons(data);
+
+      } else if (isSuccess) {
+        ar.className = 'auth-result show ok';
+        $('ar-title').innerHTML = '✅ Login Successful (Normal)';
+        $('ar-row').innerHTML = `
+          <div class="ar-field"><div class="ar-fl">Username</div><div class="ar-fv" style="color:var(--green)">${esc(data.username)}</div></div>
+          <div class="ar-field"><div class="ar-fl">Role</div><div class="ar-fv" style="color:var(--cyan)">${esc(data.role)}</div></div>
+          <div class="ar-field"><div class="ar-fl">Rows Returned</div><div class="ar-fv">${rc}</div></div>`;
+        $('ar-reason').textContent = 'Username and plaintext password matched a row in legacy_users. Normal authentication — no injection involved.';
+        showAdminButtons(data);
+
+      } else {
+        ar.className = 'auth-result show fail';
+        $('ar-title').innerHTML = '❌ Authentication Failed';
+        $('ar-row').innerHTML = `<div class="ar-field"><div class="ar-fl">Rows Returned</div><div class="ar-fv">${rc}</div></div>`;
+        $('ar-reason').textContent = rc === 0
+          ? '0 rows matched. The WHERE clause returned no results. Try a different payload.'
+          : 'Rows returned but password did not match.';
+        $('action-row').style.display = 'none';
+      }
+
+    } else {
+      // ─── Demo 2: Modern — bcrypt always called, no classic bypass ────
+      const bCalled = data.bcrypt_check_called;
+      const bResult = data.bcrypt_check_result;
+
+      const bcryptRow = bCalled
+        ? `<div class="ar-field" style="flex:100%">
+             <div class="ar-fl">bcrypt.checkpw()</div>
+             <div class="ar-fv" style="color:${bResult ? 'var(--green)' : 'var(--red)'}">
+               ${bResult ? '✅ TRUE — password matched' : '❌ FALSE — wrong password'}
+             </div>
+           </div>`
+        : `<div class="ar-field" style="flex:100%">
+             <div class="ar-fl">bcrypt.checkpw()</div>
+             <div class="ar-fv" style="color:var(--muted)">Not called — no row returned</div>
+           </div>`;
+
+      if (isInjection && rc > 0 && !isSuccess) {
+        // 3-step: SQLi found row but bcrypt blocked login
+        ar.className = 'auth-result show fail';
+        $('ar-title').innerHTML = '🛡️ SQL Injection Found the Row — bcrypt Blocked Login';
+        $('ar-row').innerHTML = `
+          <div class="ar-field"><div class="ar-fl" style="color:var(--orange)">STEP 1 — SQL</div><div class="ar-fv" style="color:var(--orange)">${rc} row(s) returned (injection succeeded)</div></div>
+          ${bcryptRow}
+          <div class="ar-field"><div class="ar-fl" style="color:var(--red)">STEP 3 — Auth</div><div class="ar-fv" style="color:var(--red)">DENIED</div></div>`;
+        $('ar-reason').textContent = 'SQL injection modified the WHERE clause and retrieved the account row. However, bcrypt.checkpw() was still called with the supplied password. The wrong password means bcrypt returned False → login denied. This is the key lesson of Demo 2: modern hashing prevents login bypass even when injection succeeds.';
+        $('action-row').style.display = '';
+        $('action-row').innerHTML = `<a href="/search" class="btn-action btn-search">🔍 Try UNION Attack on Search →</a>`;
+        $('modern-note').style.display = 'block';
+
+      } else if (isInjection && rc > 0 && isSuccess) {
+        // Edge case: injection found row AND correct password given
+        ar.className = 'auth-result show ok';
+        $('ar-title').innerHTML = '⚠️ SQL Injection + Correct Password';
+        $('ar-row').innerHTML = `
+          <div class="ar-field"><div class="ar-fl" style="color:var(--orange)">STEP 1 — SQL</div><div class="ar-fv" style="color:var(--orange)">${rc} row(s) returned</div></div>
+          ${bcryptRow}
+          <div class="ar-field"><div class="ar-fl" style="color:var(--green)">STEP 3 — Auth</div><div class="ar-fv" style="color:var(--green)">GRANTED — as ${esc(data.username)}</div></div>`;
+        $('ar-reason').textContent = 'SQL injection retrieved the row AND the correct password was supplied. Login succeeded — but only because you knew the real password. This is data-exposure via SQL injection, not a classic auth bypass. bcrypt still required the correct password.';
+        showAdminButtons(data);
+
+      } else if (isInjection && rc === 0) {
+        // Injection failed to find any row
+        ar.className = 'auth-result show fail';
+        $('ar-title').innerHTML = '⚠️ SQL Injection — No Rows Returned';
+        $('ar-row').innerHTML = `
+          <div class="ar-field"><div class="ar-fl" style="color:var(--orange)">STEP 1 — SQL</div><div class="ar-fv" style="color:var(--muted)">0 rows returned</div></div>
+          <div class="ar-field"><div class="ar-fl">STEP 2 — bcrypt</div><div class="ar-fv" style="color:var(--muted)">Not called</div></div>
+          <div class="ar-field"><div class="ar-fl" style="color:var(--red)">STEP 3 — Auth</div><div class="ar-fv" style="color:var(--red)">DENIED</div></div>`;
+        $('ar-reason').textContent = '0 rows matched. The injection payload was detected but the WHERE clause found no matching account. Try targeting a username that exists (e.g. admin\' --)';
+        $('action-row').style.display = 'none';
+
+      } else if (isSuccess) {
+        ar.className = 'auth-result show ok';
+        $('ar-title').innerHTML = '✅ Login Successful';
+        $('ar-row').innerHTML = `
+          <div class="ar-field"><div class="ar-fl">STEP 1 — SQL</div><div class="ar-fv" style="color:var(--cyan)">${rc} row(s)</div></div>
+          ${bcryptRow}
+          <div class="ar-field"><div class="ar-fl" style="color:var(--green)">STEP 3 — Auth</div><div class="ar-fv" style="color:var(--green)">GRANTED — ${esc(data.username)}</div></div>`;
+        $('ar-reason').textContent = 'Username found in database. bcrypt.checkpw() returned True — correct password supplied. Normal login.';
+        showAdminButtons(data);
+
+      } else {
+        ar.className = 'auth-result show fail';
+        $('ar-title').innerHTML = '❌ Authentication Failed';
+        $('ar-row').innerHTML = `
+          <div class="ar-field"><div class="ar-fl">STEP 1 — SQL</div><div class="ar-fv">${rc} row(s)</div></div>
+          ${bcryptRow}
+          <div class="ar-field"><div class="ar-fl" style="color:var(--red)">STEP 3 — Auth</div><div class="ar-fv" style="color:var(--red)">DENIED</div></div>`;
+        $('ar-reason').textContent = rc === 0
+          ? '0 rows returned. Username not found in database.'
+          : 'Row found but bcrypt.checkpw() returned False — wrong password.';
+        $('action-row').style.display = 'none';
+      }
+    }
+
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Rows Returned table (shows raw SQL result set)
+  // ─────────────────────────────────────────────────────────────
+  function renderRowsTable(rows, isInjection, totalCount) {
+    if (totalCount === 0) {
+      $('rows-card').style.display = 'none';
+      return;
+    }
+    $('rows-card').style.display = '';
+    // True bypass only exists in Demo 1 (legacy, plaintext passwords).
+    // In Demo 2, injection finding rows is DATA EXPOSURE, not auth bypass.
+    const isBypass = isInjection && rows.length > 0 && currentDemo === 'legacy';
+    const isDataExposure = isInjection && rows.length > 0 && currentDemo === 'modern';
+    $('rows-title').textContent = isBypass
+      ? `\ud83d\udea8 ${totalCount} Row(s) Returned \u2014 Bypass Active!`
+      : isDataExposure
+        ? `\u26a0\ufe0f ${totalCount} Row(s) Returned \u2014 Data Exposure (bcrypt still active)`
+        : `\ud83d\uddc2\ufe0f ${totalCount} Row(s) Returned`;
+    $('rows-badge').textContent = `${totalCount} row(s)`;
+    $('rows-badge').className = 'badge ' + (isBypass ? 'b-crit' : isDataExposure ? 'b-r' : 'b-c');
+
+    const hasPw = rows.length > 0 && 'password' in rows[0];
+    const hdrs = hasPw ? ['ID', 'Username', 'Password', 'Role'] : ['ID', 'Username', 'Role'];
+    const keys = hasPw ? ['id', 'username', 'password', 'role'] : ['id', 'username', 'role'];
+    const tbody = rows.map((r, i) => {
+      const cls = i === 0 ? (isBypass ? 'row-bypass' : 'row-first') : '';
+      const selBadge = i === 0
+        ? '<span class="row-badge rb-sel">rows[0] \u2190 selected</span>'
+        : '<span class="row-badge rb-skip">skipped</span>';
+      const cells = keys.map(k => {
+        const val = esc(r[k] || '');
+        if (k === 'password') return `<td class="td-pw">${val} <span style="font-size:.6rem;opacity:.55;font-weight:400">[plaintext!]</span></td>`;
+        if (k === 'role')     return `<td class="${val.toLowerCase() === 'admin' ? 'td-role-admin' : ''}">${val}</td>`;
+        if (k === 'username') return `<td>${val}${i === 0 ? selBadge : ''}</td>`;
+        return `<td>${val}</td>`;
+      }).join('');
+      return `<tr class="${cls}">${cells}</tr>`;
+    }).join('');
+
+    $('rows-table-wrap').innerHTML =
+      `<table class="rt"><thead><tr>${hdrs.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${tbody}</tbody></table>`;
+
+    if (isBypass && rows.length > 1) {
+      $('rows-explanation').innerHTML = `<strong style="color:var(--orange)">${rows.length} rows returned.</strong> The application selects <code>rows[0]</code> — the first record. <strong>${esc(rows[0].username)}</strong> becomes the authenticated user. All ${rows.length} plaintext passwords are visible to the attacker.`;
+    } else if (isBypass) {
+      $('rows-explanation').innerHTML = `1 row returned. <strong style="color:var(--orange)">${esc(rows[0].username)}</strong> is logged in. Plaintext password <span style="color:var(--red);font-family:var(--mono)">"${esc(rows[0].password)}"</span> is directly visible — no cracking needed.`;
+    } else if (rows.length > 0) {
+      $('rows-explanation').innerHTML = `Normal authentication: query matched ${rows.length} row(s) with correct credentials.`;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Role-based admin action buttons
+  // Called from every successful-login branch. Shows Download DB
+  // and Admin Panel whenever data.role === 'admin', regardless of
+  // authentication method (normal / SQLi bypass, Vulnerable /
+  // Secure Mode, Demo 1 / Demo 2).
+  // ─────────────────────────────────────────────────────────────
+  function showAdminButtons(data) {
+    const ar = $('action-row');
+    if (data.role === 'admin') {
+      // Set from scratch — clearAll() ensures the row is empty before
+      // each login attempt, so buttons appear exactly once.
+      ar.innerHTML =
+        `<a href="/api/admin/download-db" class="btn-action btn-admin">\ud83d\udcbe Download .db File</a>` +
+        `<a href="/admin" class="btn-action btn-search">\ud83d\udee1\ufe0f Admin Panel \u2192</a>`;
+      ar.style.display = '';
+    } else {
+      ar.innerHTML = '';
+      ar.style.display = 'none';
+    }
+  }
+
+  function getBypassReason(sql) {
+    if (/OR\s+1\s*=\s*1/i.test(sql))
+      return "OR 1=1 forced the WHERE clause to be TRUE for every row. The password condition was never evaluated. The application accepted rows[0] — the first user in the table.";
+    if (/--/.test(sql))
+      return "The SQL comment (--) truncated the query, removing the AND password = '...' condition entirely. Only the username existence check ran.";
+    if (/OR\s+'.+?'='.+?'/i.test(sql))
+      return "The injected OR condition in the password field evaluates to TRUE, overriding the AND operator and bypassing the password check.";
+    return "SQL injection modified the WHERE clause, causing the database to return rows without valid credentials.";
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Utilities
+  // ─────────────────────────────────────────────────────────────
+  function esc(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // Initialise AFTER all functions are defined
+  const urlDemo = new URLSearchParams(location.search).get('demo');
+  if (urlDemo === 'modern') setDemo('modern'); else setDemo('legacy');
+})();
+</script>
+</body>
+</html>

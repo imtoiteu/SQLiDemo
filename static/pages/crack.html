@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Password Analysis — SQLiLab</title>
+  <meta name="description" content="Forensic password analysis: select targets, choose a wordlist profile, run a cancellable offline dictionary attack, and see which accounts are cracked." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #080b14;
+      --s1:      #0e1324;
+      --s2:      #141928;
+      --s3:      #1a2035;
+      --b1:      #1e2a45;
+      --b2:      #253354;
+      --accent:  #6c63ff;
+      --accent2: #a78bfa;
+      --cyan:    #22d3ee;
+      --green:   #34d399;
+      --red:     #f87171;
+      --orange:  #fb923c;
+      --yellow:  #fbbf24;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --mono:    'JetBrains Mono', monospace;
+      --font:    'Inter', sans-serif;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.6; min-height: 100vh; }
+    .bg-grid {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(108,99,255,.04) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(108,99,255,.04) 1px,transparent 1px);
+      background-size: 40px 40px;
+    }
+    .bg-glow { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: radial-gradient(ellipse 90% 45% at 50% -5%, rgba(248,113,113,.09),transparent); }
+
+    /* Navbar */
+    .nav { position: sticky; top: 0; z-index: 100; background: rgba(8,11,20,.93); backdrop-filter: blur(20px); border-bottom: 1px solid var(--b1); }
+    .nav-i { max-width: 1300px; margin: 0 auto; padding: 0 1.4rem; display: flex; align-items: center; gap: 1rem; height: 58px; }
+    .nav-logo { font-weight: 900; font-size: 1.05rem; color: var(--text); text-decoration: none; white-space: nowrap; }
+    .nav-logo span { color: var(--accent2); }
+    .nav-links { display: flex; gap: .1rem; list-style: none; flex: 1; flex-wrap: wrap; }
+    .nav-link { padding: .28rem .65rem; border-radius: 6px; color: var(--muted); text-decoration: none; font-size: .79rem; font-weight: 500; transition: all .2s; }
+    .nav-link:hover { color: var(--text); background: rgba(108,99,255,.1); }
+    .nav-link.active { color: var(--accent2); background: rgba(108,99,255,.12); }
+
+    /* Page */
+    .page { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 1.6rem 1.4rem 5rem; }
+
+    /* Attack chain */
+    .chain { display: flex; align-items: center; gap: 0; margin-bottom: 1.4rem; overflow-x: auto; }
+    .cn { padding: .42rem .85rem; border-radius: 7px; font-size: .77rem; font-weight: 700; border: 1px solid var(--b1); background: var(--s1); white-space: nowrap; transition: all .25s; color: var(--muted); }
+    .cn.done   { border-color: rgba(52,211,153,.3);  color: var(--green); background: rgba(52,211,153,.05); }
+    .cn.active { border-color: rgba(248,113,113,.4); color: var(--red);   background: rgba(248,113,113,.07); }
+    .cn-arr { padding: 0 .25rem; color: var(--b1); }
+
+    /* Phase bar */
+    .phases { display: flex; align-items: center; background: var(--s1); border: 1px solid var(--b1); border-radius: 9px; padding: .45rem .8rem; margin-bottom: 1.4rem; overflow-x: auto; gap: 0; }
+    .ph { display: flex; align-items: center; gap: .35rem; padding: .28rem .65rem; border-radius: 7px; font-size: .74rem; font-weight: 600; color: var(--muted); white-space: nowrap; transition: all .2s; }
+    .ph.active { color: var(--accent2); background: rgba(108,99,255,.12); }
+    .ph.done   { color: var(--green); }
+    .ph-n { width: 17px; height: 17px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .64rem; font-weight: 800; background: var(--b1); color: var(--muted); }
+    .ph.active .ph-n { background: var(--accent); color: #fff; }
+    .ph.done   .ph-n { background: var(--green);  color: #0a1a12; }
+    .ph-sep { color: var(--b1); margin: 0 .05rem; }
+
+    /* Cards */
+    .card { background: var(--s1); border: 1px solid var(--b1); border-radius: 13px; overflow: hidden; margin-bottom: 1.1rem; }
+    .card-h { padding: .85rem 1.3rem; border-bottom: 1px solid var(--b1); display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+    .card-hl { display: flex; flex-direction: column; gap: .12rem; }
+    .card-t { font-weight: 800; font-size: .9rem; display: flex; align-items: center; gap: .42rem; flex-wrap: wrap; }
+    .card-s { font-size: .74rem; color: var(--muted); }
+    .card-b { padding: 1rem 1.3rem; }
+
+    /* Section badges */
+    .sb { display: inline-flex; align-items: center; padding: .18rem .55rem; border-radius: 4px; font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
+    .sb-a { background: rgba(34,211,238,.1);  border: 1px solid rgba(34,211,238,.2);  color: var(--cyan); }
+    .sb-b { background: rgba(108,99,255,.1); border: 1px solid rgba(108,99,255,.2); color: var(--accent2); }
+    .sb-c { background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.2); color: var(--red); }
+
+    /* Upload */
+    .dropzone { border: 2px dashed var(--b1); border-radius: 11px; padding: 2.2rem 1.5rem; text-align: center; cursor: pointer; transition: all .22s; background: rgba(108,99,255,.02); }
+    .dropzone:hover, .dropzone.over { border-color: var(--accent); background: rgba(108,99,255,.07); }
+    .dropzone input[type=file] { display: none; }
+    .dz-icon { font-size: 2.2rem; margin-bottom: .5rem; }
+    .dz-title { font-size: .92rem; font-weight: 700; margin-bottom: .25rem; }
+    .dz-sub { font-size: .78rem; color: var(--muted); }
+    .dz-hint { display: inline-block; margin-top: .55rem; padding: .22rem .65rem; border-radius: 4px; background: rgba(34,211,238,.07); border: 1px solid rgba(34,211,238,.15); font-family: var(--mono); font-size: .74rem; color: var(--cyan); }
+    .mini-chain { display: grid; grid-template-columns: repeat(4,1fr); gap: .6rem; margin-top: 1.1rem; }
+    .mc { background: var(--s2); border: 1px solid var(--b1); border-radius: 8px; padding: .65rem .8rem; text-align: center; }
+    .mc-step { font-size: .62rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: .12rem; }
+    .mc-icon { font-size: 1.1rem; }
+    .mc-label { font-size: .74rem; font-weight: 600; margin-top: .1rem; line-height: 1.3; }
+
+    /* Tables explorer */
+    .tiles { display: flex; flex-wrap: wrap; gap: .6rem; }
+    .tile { padding: .6rem .85rem; border-radius: 8px; border: 1px solid var(--b1); background: var(--s2); min-width: 110px; }
+    .tile.target { border-color: rgba(248,113,113,.35); background: rgba(248,113,113,.04); }
+    .tile-name { font-family: var(--mono); font-size: .8rem; font-weight: 700; }
+    .tile-meta { font-size: .7rem; color: var(--muted); margin-top: .1rem; }
+    .t-tag { display: inline-block; padding: .08rem .38rem; border-radius: 3px; font-size: .6rem; font-weight: 800; text-transform: uppercase; background: rgba(248,113,113,.15); border: 1px solid rgba(248,113,113,.25); color: var(--red); margin-left: .3rem; }
+
+    /* Users table */
+    .dt { width: 100%; border-collapse: collapse; }
+    .dt th { padding: .42rem .95rem; font-size: .67rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); background: var(--s2); text-align: left; border-bottom: 1px solid var(--b1); white-space: nowrap; }
+    .dt td { padding: .58rem .95rem; font-size: .8rem; border-bottom: 1px solid rgba(30,42,69,.4); vertical-align: middle; }
+    .dt tr:last-child td { border-bottom: none; }
+    .dt tr:hover td { background: rgba(108,99,255,.035); }
+
+    /* Checkbox */
+    .chk { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
+
+    /* Role badges */
+    .rb { padding: .12rem .45rem; border-radius: 4px; font-size: .65rem; font-weight: 800; text-transform: uppercase; }
+    .rb-admin { background: rgba(248,113,113,.12); border: 1px solid rgba(248,113,113,.25); color: var(--red); }
+    .rb-user  { background: rgba(100,116,139,.1);  border: 1px solid rgba(100,116,139,.18); color: var(--muted); }
+
+    /* Hash cell */
+    .hash-w { position: relative; }
+    .hash-s { font-family: var(--mono); font-size: .73rem; color: var(--orange); cursor: help; }
+    .hash-tip { display: none; position: absolute; z-index: 50; top: 110%; left: 0; background: #050810; border: 1px solid var(--b2); border-radius: 7px; padding: .55rem .8rem; font-family: var(--mono); font-size: .71rem; color: var(--orange); width: 380px; word-break: break-all; box-shadow: 0 8px 28px rgba(0,0,0,.85); }
+    .hash-w:hover .hash-tip { display: block; }
+    .algo-b { display: inline-block; padding: .1rem .4rem; border-radius: 3px; font-size: .64rem; font-weight: 700; text-transform: uppercase; background: rgba(251,146,60,.1); border: 1px solid rgba(251,146,60,.18); color: var(--orange); }
+
+    /* Analyze row button */
+    .btn-row { padding: .28rem .7rem; border-radius: 6px; border: 1px solid rgba(108,99,255,.3); background: rgba(108,99,255,.1); color: var(--accent2); font-size: .74rem; font-weight: 700; cursor: pointer; transition: all .2s; white-space: nowrap; }
+    .btn-row:hover { background: rgba(108,99,255,.2); border-color: rgba(108,99,255,.5); }
+
+    /* Target controls */
+    .tgt-ctrl { display: flex; align-items: center; gap: .65rem; padding: .65rem 1.3rem; border-top: 1px solid var(--b1); background: var(--s2); flex-wrap: wrap; }
+    .tgt-btn { padding: .3rem .75rem; border-radius: 6px; border: 1px solid var(--b1); background: transparent; color: var(--muted); font-size: .78rem; font-weight: 600; cursor: pointer; transition: all .18s; }
+    .tgt-btn:hover { border-color: var(--b2); color: var(--text); }
+    .tgt-count { font-size: .78rem; color: var(--accent2); font-weight: 700; margin-left: auto; }
+
+    /* Notices */
+    .notice { padding: .7rem .95rem; border-radius: 8px; font-size: .79rem; line-height: 1.5; margin-bottom: .65rem; }
+    .n-warn  { background: rgba(251,146,60,.06);  border: 1px solid rgba(251,146,60,.2);  color: rgba(251,146,60,.9); }
+    .n-info  { background: rgba(108,99,255,.07);  border: 1px solid rgba(108,99,255,.2);  color: var(--accent2); }
+    .n-danger{ background: rgba(248,113,113,.06); border: 1px solid rgba(248,113,113,.2); color: rgba(248,113,113,.9); }
+    .n-safe  { background: rgba(52,211,153,.05);  border: 1px solid rgba(52,211,153,.2);  color: rgba(52,211,153,.9); }
+    .notice:last-child { margin-bottom: 0; }
+
+    /* Profile selector */
+    .profile-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: .8rem; margin-bottom: .85rem; }
+    .pc { border-radius: 11px; border: 2px solid var(--b1); padding: 1rem 1rem .85rem; cursor: pointer; transition: all .2s; background: var(--s2); position: relative; }
+    .pc:hover { border-color: var(--b2); background: var(--s3); }
+    .pc.sel-g { border-color: rgba(52,211,153,.55);  background: rgba(52,211,153,.05); }
+    .pc.sel-o { border-color: rgba(251,146,60,.55);  background: rgba(251,146,60,.04); }
+    .pc.sel-r { border-color: rgba(248,113,113,.55); background: rgba(248,113,113,.04); }
+    .pc-radio { position: absolute; top: .9rem; right: .9rem; width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--b1); background: var(--s2); transition: all .2s; }
+    .pc.sel-g .pc-radio { border-color: var(--green);  background: var(--green);  box-shadow: 0 0 0 3px rgba(52,211,153,.2); }
+    .pc.sel-o .pc-radio { border-color: var(--orange); background: var(--orange); box-shadow: 0 0 0 3px rgba(251,146,60,.2); }
+    .pc.sel-r .pc-radio { border-color: var(--red);    background: var(--red);    box-shadow: 0 0 0 3px rgba(248,113,113,.2); }
+    .pc-name { font-weight: 800; font-size: .87rem; margin-bottom: .2rem; padding-right: 1.4rem; }
+    .pc-count { font-family: var(--mono); font-size: 1.3rem; font-weight: 700; line-height: 1; margin-bottom: .18rem; }
+    .pc-count.g { color: var(--green); }
+    .pc-count.o { color: var(--orange); }
+    .pc-count.r { color: var(--red); }
+    .pc-desc { font-size: .74rem; color: var(--muted); line-height: 1.4; margin-bottom: .4rem; }
+    .pc-rt { font-size: .68rem; color: var(--muted); }
+    .pc-ex { display: flex; flex-wrap: wrap; gap: .25rem; margin-top: .4rem; }
+    .pc-ex-tag { font-family: var(--mono); font-size: .67rem; padding: .1rem .38rem; border-radius: 3px; background: rgba(100,116,139,.1); border: 1px solid rgba(100,116,139,.15); color: var(--muted); }
+
+    /* Comparison table */
+    .cmp { width: 100%; border-collapse: collapse; margin-top: .7rem; }
+    .cmp th { padding: .38rem .8rem; font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--s2); text-align: left; border-bottom: 1px solid var(--b1); }
+    .cmp td { padding: .48rem .8rem; font-size: .79rem; border-bottom: 1px solid rgba(30,42,69,.38); }
+    .cmp tr:last-child td { border-bottom: none; }
+    .cmp tr.sel-row td { background: rgba(108,99,255,.05); }
+
+    /* Start / Stop controls */
+    .ctrl-bar { display: flex; align-items: center; gap: .75rem; padding: 1rem 1.3rem; flex-wrap: wrap; }
+    .btn-start { flex: 1; min-width: 200px; padding: .85rem 1.2rem; border-radius: 9px; border: none; cursor: pointer; font-family: var(--font); font-size: .92rem; font-weight: 800; letter-spacing: .02em; background: linear-gradient(135deg,#b91c1c,var(--red),var(--orange)); color: #fff; box-shadow: 0 4px 20px rgba(248,113,113,.38); transition: all .22s; }
+    .btn-start:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(248,113,113,.55); }
+    .btn-start:disabled { opacity: .35; cursor: not-allowed; transform: none !important; }
+    .btn-stop { padding: .85rem 1.4rem; border-radius: 9px; border: 1px solid rgba(248,113,113,.4); background: rgba(248,113,113,.1); color: var(--red); font-size: .9rem; font-weight: 800; cursor: pointer; transition: all .2s; display: none; }
+    .btn-stop:hover { background: rgba(248,113,113,.2); }
+    .btn-stop.show { display: block; }
+    .ctrl-hint { font-size: .76rem; color: var(--muted); }
+
+    /* Per-target progress */
+    .progress-wrap { display: none; margin-bottom: 1.1rem; }
+    .progress-wrap.show { display: block; }
+
+    /* Current target hero */
+    .target-hero { padding: 1.1rem 1.3rem; background: var(--s2); border-bottom: 1px solid var(--b1); display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap; }
+    .th-user { font-family: var(--mono); font-size: 1.5rem; font-weight: 800; color: var(--orange); }
+    .th-meta { display: flex; flex-direction: column; gap: .12rem; }
+    .th-profile { font-size: .75rem; color: var(--muted); }
+    .th-candidate { font-family: var(--mono); font-size: .8rem; color: var(--accent2); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .th-timer { margin-left: auto; font-family: var(--mono); font-size: 1.1rem; font-weight: 700; color: var(--yellow); }
+
+    /* Per-target progress bar */
+    .per-bar { padding: .55rem 1.1rem; border-bottom: 1px solid var(--b1); background: var(--s2); }
+    .per-bar-label { display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); margin-bottom: .28rem; }
+    .bar { height: 5px; background: var(--s3); border-radius: 3px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg,var(--red),var(--orange)); transition: width .3s ease; width: 0%; }
+
+    /* Console */
+    .console { background: #04060f; padding: .85rem 1.05rem; font-family: var(--mono); font-size: .77rem; color: rgba(52,211,153,.75); min-height: 100px; max-height: 150px; overflow-y: auto; line-height: 1.65; }
+    .cl { display: block; }
+    .cl.d { color: var(--muted); }
+    .cl.ok{ color: var(--green); }
+    .cl.w { color: var(--orange); }
+    .cl.e { color: var(--red); }
+    .cur { display: inline-block; width: 7px; height: 12px; background: var(--green); animation: blink .7s step-end infinite; vertical-align: middle; margin-left: 2px; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Live stats strip */
+    .ls { display: grid; grid-template-columns: repeat(4,1fr); border-top: 1px solid var(--b1); }
+    .ls-s { padding: .6rem 1rem; text-align: center; border-right: 1px solid var(--b1); }
+    .ls-s:last-child { border-right: none; }
+    .ls-n { font-size: 1.3rem; font-weight: 800; }
+    .ls-l { font-size: .67rem; color: var(--muted); margin-top: .08rem; }
+
+    /* Cancelled banner */
+    .cancelled-banner { display: none; padding: .9rem 1.3rem; background: rgba(251,146,60,.08); border: 1px solid rgba(251,146,60,.25); border-radius: 10px; margin-bottom: 1.1rem; }
+    .cancelled-banner.show { display: flex; align-items: center; gap: .85rem; flex-wrap: wrap; }
+    .cb-title { font-weight: 800; color: var(--orange); font-size: .9rem; }
+    .cb-stats { font-size: .79rem; color: var(--muted); }
+
+    /* Results */
+    .sum-row { display: grid; grid-template-columns: repeat(4,1fr); gap: .7rem; margin-bottom: 1.1rem; }
+    .sum-s { background: var(--s1); border: 1px solid var(--b1); border-radius: 11px; padding: .85rem 1rem; text-align: center; }
+    .sum-n { font-size: 1.65rem; font-weight: 800; line-height: 1; }
+    .sum-n.total   { color: var(--cyan); }
+    .sum-n.cracked { color: var(--red); }
+    .sum-n.safe    { color: var(--green); }
+    .sum-n.time    { font-size: 1.2rem; color: var(--orange); }
+    .sum-l { font-size: .69rem; color: var(--muted); margin-top: .22rem; }
+
+    .entry { border-radius: 10px; border: 1px solid var(--b1); border-left-width: 3px; padding: .95rem 1.2rem; margin-bottom: .6rem; background: var(--s1); animation: fi .3s ease; }
+    @keyframes fi { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+    .entry.crk    { border-left-color: var(--red); }
+    .entry.nc     { border-left-color: var(--green); }
+    .entry-top    { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; margin-bottom: .35rem; }
+    .e-user       { font-family: var(--mono); font-weight: 700; font-size: .88rem; }
+    .e-badge      { padding: .12rem .5rem; border-radius: 4px; font-size: .66rem; font-weight: 800; text-transform: uppercase; }
+    .e-c  { background: rgba(248,113,113,.13); border: 1px solid rgba(248,113,113,.28); color: var(--red); }
+    .e-nc { background: rgba(52,211,153,.09);  border: 1px solid rgba(52,211,153,.22);  color: var(--green); }
+    .e-meta  { font-size: .69rem; color: var(--muted); margin-left: auto; }
+    .e-hash  { font-family: var(--mono); font-size: .72rem; color: var(--muted); margin-bottom: .38rem; word-break: break-all; }
+    .rec-box { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; padding: .5rem .82rem; border-radius: 7px; background: rgba(248,113,113,.06); border: 1px solid rgba(248,113,113,.18); margin-bottom: .38rem; }
+    .rec-lbl { font-size: .67rem; font-weight: 700; color: rgba(248,113,113,.7); min-width: 115px; }
+    .rec-pw  { font-family: var(--mono); font-weight: 800; font-size: .9rem; color: var(--red); }
+    .rec-pos { font-size: .69rem; color: var(--muted); margin-left: auto; }
+    .e-exp   { font-size: .77rem; color: var(--muted); line-height: 1.5; }
+
+    /* Education */
+    .edu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+    .edu-card { padding: .85rem .95rem; border-radius: 9px; border: 1px solid var(--b1); background: var(--s2); }
+    .edu-t { font-weight: 800; font-size: .82rem; margin-bottom: .32rem; }
+    .edu-b { font-size: .77rem; color: var(--muted); line-height: 1.5; }
+    .edu-list { list-style: none; }
+    .edu-list li { font-size: .77rem; color: var(--muted); padding: .15rem 0; display: flex; gap: .4rem; }
+    .edu-list li::before { content: '→'; color: var(--orange); flex-shrink: 0; }
+    .atk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+    .atk-i { padding: .75rem .9rem; border-radius: 8px; background: rgba(248,113,113,.04); border: 1px solid rgba(248,113,113,.12); }
+    .atk-t { font-weight: 700; font-size: .8rem; color: var(--red); margin-bottom: .18rem; }
+    .atk-b { font-size: .74rem; color: var(--muted); line-height: 1.45; }
+
+    /* Spinner */
+    .spin { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.2); border-top-color: #fff; border-radius: 50%; animation: rot .7s linear infinite; vertical-align: middle; margin-right: .3rem; }
+    @keyframes rot { to { transform: rotate(360deg); } }
+
+    @media (max-width: 840px) {
+      .profile-grid { grid-template-columns: 1fr; }
+      .mini-chain   { grid-template-columns: 1fr 1fr; }
+      .sum-row      { grid-template-columns: 1fr 1fr; }
+      .edu-grid, .atk-grid { grid-template-columns: 1fr; }
+      .ls           { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="bg-glow"  aria-hidden="true"></div>
+
+<nav class="nav">
+  <div class="nav-i">
+    <a href="/" class="nav-logo">⚡ SQLi<span>Lab</span></a>
+    <ul class="nav-links">
+      <li><a href="/"          class="nav-link">Home</a></li>
+      <li><a href="/register"  class="nav-link">Register</a></li>
+      <li><a href="/login"     class="nav-link">Login</a></li>
+      <li><a href="/inspector" class="nav-link">Inspector</a></li>
+      <li><a href="/admin"     class="nav-link">Admin</a></li>
+      <li><a href="/crack"     class="nav-link active">Password Analysis</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- Attack chain -->
+  <div class="chain">
+    <div class="cn done">🔓 SQL Injection</div><div class="cn-arr">›</div>
+    <div class="cn done">💾 Database Theft</div><div class="cn-arr">›</div>
+    <div class="cn active" id="cn3">🧬 Hash Discovery</div><div class="cn-arr">›</div>
+    <div class="cn" id="cn4">🔑 Password Recovery</div>
+  </div>
+
+  <!-- Phase bar -->
+  <div class="phases">
+    <div class="ph active" id="ph1"><div class="ph-n">1</div> Upload DB</div><div class="ph-sep">›</div>
+    <div class="ph"        id="ph2"><div class="ph-n">2</div> Explore</div><div class="ph-sep">›</div>
+    <div class="ph"        id="ph3"><div class="ph-n">3</div> Select Targets</div><div class="ph-sep">›</div>
+    <div class="ph"        id="ph4"><div class="ph-n">4</div> Configure</div><div class="ph-sep">›</div>
+    <div class="ph"        id="ph5"><div class="ph-n">5</div> Run Attack</div><div class="ph-sep">›</div>
+    <div class="ph"        id="ph6"><div class="ph-n">6</div> Results</div>
+  </div>
+
+  <!-- ════ PHASE 1: Upload ════ -->
+  <div id="p1">
+    <div class="card">
+      <div class="card-h">
+        <div class="card-hl">
+          <div class="card-t">🗄️ Upload Breached Database</div>
+          <div class="card-s">Step 1 — Upload the SQLite file downloaded from the SQL Injection lab</div>
+        </div>
+        <span class="sb sb-a">Phase 1</span>
+      </div>
+      <div class="card-b">
+        <div class="dropzone" id="dz" onclick="document.getElementById('fi').click()">
+          <input type="file" id="fi" accept=".db,.sqlite,.sqlite3" />
+          <div class="dz-icon">🗄️</div>
+          <div class="dz-title">Drop the leaked database file here</div>
+          <div class="dz-sub">or click to browse your Downloads folder</div>
+          <div class="dz-hint">sqlilab_breached.db</div>
+        </div>
+        <div class="mini-chain">
+          <div class="mc"><div class="mc-step">Phase 1</div><div class="mc-icon">🔓</div><div class="mc-label">SQL Injection login bypass</div></div>
+          <div class="mc"><div class="mc-step">Phase 2</div><div class="mc-icon">💾</div><div class="mc-label">Download leaked SQLite DB</div></div>
+          <div class="mc"><div class="mc-step">Phase 3</div><div class="mc-icon">🧬</div><div class="mc-label">Inspect stolen hashes</div></div>
+          <div class="mc"><div class="mc-step">Phase 4</div><div class="mc-icon">🔑</div><div class="mc-label">Offline dictionary attack</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ SECTIONS A + B ════ -->
+  <div id="p2" style="display:none">
+
+    <!-- SECTION A: Database Contents + Target Selection -->
+    <div class="card">
+      <div class="card-h">
+        <div class="card-hl">
+          <div class="card-t"><span class="sb sb-a">Section A</span> 📂 Database Contents</div>
+          <div class="card-s" id="db-file-lbl">File: —</div>
+        </div>
+      </div>
+      <div class="card-b" style="border-bottom:1px solid var(--b1)">
+        <div class="notice n-warn" style="margin-bottom:.6rem">
+          🔍 <strong>Forensic Analysis:</strong> Two separate attack phases have occurred.
+          SQL Injection stole this database. Now the attacker works offline — the server is no longer involved.
+        </div>
+        <div class="tiles" id="tbl-tiles"></div>
+      </div>
+
+      <!-- Users table with target selection -->
+      <div id="users-sec">
+        <div style="padding:.7rem 1.3rem;border-bottom:1px solid var(--b1);background:rgba(248,113,113,.03);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+          <div class="card-t" style="font-size:.84rem">
+            👥 <code style="font-family:var(--mono)">`users`</code> Table — Select Targets for Analysis
+          </div>
+          <span id="user-count" style="font-size:.72rem;color:var(--muted)"></span>
+        </div>
+        <div style="padding:.65rem 1.3rem;border-bottom:1px solid var(--b1)">
+          <div class="notice n-danger" style="margin-bottom:.5rem">☠️ <strong>Breach Confirmed.</strong> Every row below is an account whose bcrypt hash is now in the attacker's hands.</div>
+          <div class="notice n-info"   style="margin-bottom:.5rem" id="n-bcrypt"></div>
+          <div class="notice n-warn"   style="margin-bottom:0"    id="n-noplain"></div>
+        </div>
+
+        <div style="overflow-x:auto">
+          <table class="dt" id="users-dt">
+            <thead>
+              <tr>
+                <th><input type="checkbox" class="chk" id="chk-all" title="Select / deselect all" /></th>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Password Hash (bcrypt)</th>
+                <th>Algo</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="tgt-ctrl">
+          <button class="tgt-btn" onclick="selectAll()">☑ Select All</button>
+          <button class="tgt-btn" onclick="deselectAll()">☐ Deselect All</button>
+          <div class="notice n-safe" style="margin-bottom:0;padding:.35rem .7rem;font-size:.76rem">
+            ✅ No plaintext passwords in this DB.
+            Cracking runs offline using <code style="font-family:var(--mono)">bcrypt.checkpw()</code>.
+          </div>
+          <span class="tgt-count" id="tgt-count">0 selected</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION B: Profile selector + controls -->
+    <div class="card">
+      <div class="card-h">
+        <div class="card-hl">
+          <div class="card-t"><span class="sb sb-b">Section B</span> 🗂️ Attack Configuration</div>
+          <div class="card-s">Choose a SecLists wordlist profile, then click Start</div>
+        </div>
+      </div>
+      <div class="card-b">
+        <div class="notice n-info" style="margin-bottom:.85rem">
+          ℹ️ Each candidate is tested with <code style="font-family:var(--mono);font-size:.79rem">bcrypt.checkpw()</code>.
+          No GPU, hashcat, or external tools. A larger profile = more candidates = longer runtime per account.
+        </div>
+        <div class="profile-grid" id="profile-grid"></div>
+        <table class="cmp"><thead><tr><th>Profile</th><th>Source File</th><th>Candidates</th><th>Runtime / Account</th></tr></thead>
+        <tbody id="cmp-body"></tbody></table>
+        <div class="notice n-warn" style="margin-top:.8rem;margin-bottom:0">
+          ⚠️ <strong>bcrypt cost=12 is deliberately slow</strong> (~100–400ms per check on CPU).
+          Larger profiles take proportionally longer for "not found" passwords.
+        </div>
+      </div>
+
+      <!-- Start / Stop bar -->
+      <div class="ctrl-bar" id="ctrl-bar">
+        <button class="btn-start" id="btn-start" onclick="runAnalysis()" disabled>
+          🔓 Start Analysis — Select targets above
+        </button>
+        <button class="btn-stop" id="btn-stop" onclick="stopAnalysis()">■ Stop Analysis</button>
+        <span class="ctrl-hint" id="ctrl-hint"></span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ════ SECTION C: Progress ════ -->
+  <div class="progress-wrap" id="prog-wrap">
+    <div class="card">
+      <div class="card-h" style="background:rgba(251,146,60,.04)">
+        <div class="card-hl">
+          <div class="card-t" style="color:var(--orange)">⚙️ Dictionary Attack Running</div>
+          <div class="card-s" id="prog-sub">Initializing…</div>
+        </div>
+        <span class="sb sb-c">Section C</span>
+      </div>
+
+      <!-- Current target hero -->
+      <div class="target-hero">
+        <div>
+          <div style="font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.15rem">Current Target</div>
+          <div class="th-user" id="th-user">—</div>
+        </div>
+        <div class="th-meta">
+          <div class="th-profile" id="th-profile">Profile: —</div>
+          <div class="th-candidate" id="th-cand">Candidate: —</div>
+        </div>
+        <div class="th-timer" id="th-timer">00:00</div>
+      </div>
+
+      <!-- Per-target progress bar -->
+      <div class="per-bar">
+        <div class="per-bar-label">
+          <span id="per-label">Waiting…</span>
+          <span id="per-pct">0%</span>
+        </div>
+        <div class="bar"><div class="bar-fill" id="per-fill"></div></div>
+      </div>
+
+      <!-- Console -->
+      <div class="console" id="console-box"></div>
+
+      <!-- Live stats -->
+      <div class="ls">
+        <div class="ls-s"><div class="ls-n" id="ls-cands" style="color:var(--cyan)">0</div><div class="ls-l">Candidates Tried</div></div>
+        <div class="ls-s"><div class="ls-n" id="ls-crack"  style="color:var(--red)">0</div><div class="ls-l">Passwords Cracked</div></div>
+        <div class="ls-s"><div class="ls-n" id="ls-rem"    style="color:var(--muted)">—</div><div class="ls-l">Accounts Remaining</div></div>
+        <div class="ls-s"><div class="ls-n" id="ls-acct"   style="color:var(--accent2);font-size:.95rem">—</div><div class="ls-l">Accounts Done</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cancelled banner -->
+  <div class="cancelled-banner" id="can-banner">
+    <span style="font-size:1.5rem">⏹️</span>
+    <div>
+      <div class="cb-title">Analysis Stopped</div>
+      <div class="cb-stats" id="can-stats"></div>
+    </div>
+    <button class="tgt-btn" style="margin-left:auto" onclick="resetForRerun()">↺ Reconfigure &amp; Run Again</button>
+  </div>
+
+  <!-- ════ Results ════ -->
+  <div id="results" style="display:none">
+    <div class="sum-row" id="sum-row"></div>
+    <div class="card">
+      <div class="card-h">
+        <div class="card-hl">
+          <div class="card-t"><span class="sb sb-c">Section C</span> 📊 Analysis Results</div>
+          <div class="card-s" id="res-sub"></div>
+        </div>
+      </div>
+      <div style="padding:.75rem 1.05rem" id="entries-list"></div>
+    </div>
+
+    <!-- Education panels -->
+    <div class="card">
+      <div class="card-h" style="background:rgba(251,146,60,.04)">
+        <div class="card-hl">
+          <div class="card-t" style="color:var(--orange)">📖 What just happened?</div>
+          <div class="card-s">SQL Injection → Database Theft → Hash Discovery → Offline Dictionary Attack → Weak Password Recovery</div>
+        </div>
+      </div>
+      <div class="card-b">
+        <div class="edu-grid" id="edu-grid" style="margin-bottom:.8rem"></div>
+        <div style="font-weight:800;font-size:.83rem;margin-bottom:.5rem">Security Lessons</div>
+        <ul class="edu-list" id="edu-lessons"></ul>
+      </div>
+    </div>
+
+    <div class="card" style="border-color:rgba(248,113,113,.2)">
+      <div class="card-h" style="background:rgba(248,113,113,.04)">
+        <div class="card-t" style="color:var(--red)">☠️ What can an attacker do with recovered passwords?</div>
+      </div>
+      <div class="card-b">
+        <div class="atk-grid" id="atk-grid"></div>
+        <div class="notice n-warn" style="margin-top:.85rem;margin-bottom:0" id="key-lesson"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+(function(){
+  'use strict';
+
+  /* ─── State ─── */
+  let sessionId     = null;
+  let allProfiles   = [];
+  let allUsers      = [];          // from inspect
+  let selectedUids  = new Set();   // user IDs chosen for cracking
+  let selectedProfile = 'quick';
+  let evtSource     = null;
+  let analysisRunning = false;
+  let timerInterval = null;
+  let elapsedStart  = 0;
+  let totalAccounts = 0;
+  let wordlistSize  = 0;
+  let crackedCount  = 0;
+  let completedAccts = 0;
+  let totalCandidates = 0;
+
+  /* ─── Helpers ─── */
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  function setPhase(n) {
+    for (let i=1;i<=6;i++) {
+      const el=$('ph'+i);
+      el.className='ph'+(i===n?' active':i<n?' done':'');
+      const num=el.querySelector('.ph-n');
+      if (num) num.textContent = i<n ? '✓' : i;
+    }
+  }
+
+  function addLine(text, cls='') {
+    const box=$('console-box');
+    const old=box.querySelector('.cur');
+    if(old) old.remove();
+    const s=document.createElement('span');
+    s.className='cl'+(cls?' '+cls:'');
+    s.textContent=text;
+    box.appendChild(s);
+    const cur=document.createElement('span');
+    cur.className='cur';
+    box.appendChild(cur);
+    box.scrollTop=box.scrollHeight;
+  }
+
+  function fmtTime(secs) {
+    const m=Math.floor(secs/60), s=Math.floor(secs%60);
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  /* ─── Upload ─── */
+  const dz=$('dz'), fi=$('fi');
+  fi.addEventListener('change',()=>{ if(fi.files.length) handleFile(fi.files[0]); });
+  dz.addEventListener('dragover',e=>{ e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+  dz.addEventListener('drop',e=>{ e.preventDefault(); dz.classList.remove('over'); if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
+
+  async function handleFile(file) {
+    dz.innerHTML=`<div class="dz-icon">⏳</div><div class="dz-title" style="color:var(--cyan)">Parsing…</div><div class="dz-sub" style="font-family:var(--mono)">${esc(file.name)}</div>`;
+    const form=new FormData();
+    form.append('db_file',file);
+    try {
+      const res=await fetch('/api/crack/inspect',{method:'POST',body:form});
+      if(!res.ok){ const e=await res.json(); throw new Error(e.error||'Upload failed'); }
+      const data=await res.json();
+      sessionId=data.session_id;
+      allProfiles=data.profiles||[];
+      allUsers=data.users||[];
+      renderInspection(data, file.name);
+    } catch(err) {
+      dz.innerHTML=`<div class="dz-icon">❌</div><div class="dz-title" style="color:var(--red)">${esc(err.message)}</div><div class="dz-sub">Click to try again</div>`;
+      dz.onclick=()=>fi.click();
+    }
+  }
+
+  /* ─── Render inspection ─── */
+  function renderInspection(data, filename) {
+    $('p1').style.display='none';
+    $('p2').style.display='';
+    $('db-file-lbl').textContent='File: '+filename;
+    setPhase(2);
+
+    /* Table tiles */
+    const tiles=$('tbl-tiles');
+    tiles.innerHTML='';
+    (data.tables||[]).forEach(t=>{
+      const isT=(t.name==='users');
+      const d=document.createElement('div');
+      d.className='tile'+(isT?' target':'');
+      d.innerHTML=`<div class="tile-name">${esc(t.name)}${isT?'<span class="t-tag">🎯 target</span>':''}</div>
+        <div class="tile-meta">${t.row_count} row(s) · ${(t.columns||[]).join(', ')}</div>`;
+      tiles.appendChild(d);
+    });
+
+    /* Education notices */
+    const edu=data.education||{};
+    $('n-bcrypt').innerHTML=`ℹ️ <strong>bcrypt:</strong> ${esc(edu.bcrypt_notice||'')}`;
+    $('n-noplain').innerHTML=`⚠️ <strong>No plaintext:</strong> ${esc(edu.no_plaintext||'')}`;
+
+    /* Users table */
+    if(data.has_users_table && allUsers.length>0) {
+      $('user-count').textContent=allUsers.length+' account(s) found';
+      renderUsersTable(allUsers);
+      updateSelectionCount();
+      setPhase(3);
+    }
+
+    /* Profiles */
+    renderProfiles(allProfiles);
+    setPhase(4);
+  }
+
+  /* ─── Users table ─── */
+  function renderUsersTable(users) {
+    const tbody=$('users-tbody');
+    tbody.innerHTML='';
+    users.forEach(u=>{
+      const uid=parseInt(u.id);
+      const tr=document.createElement('tr');
+      tr.id='row-'+uid;
+      const roleClass=u.role==='admin'?'rb-admin':'rb-user';
+      tr.innerHTML=`
+        <td><input type="checkbox" class="chk user-chk" data-uid="${uid}" id="chk-${uid}" /></td>
+        <td class="" style="font-family:var(--mono);font-size:.77rem">${esc(u.id)}</td>
+        <td><strong>${esc(u.username)}</strong></td>
+        <td style="font-family:var(--mono);font-size:.74rem;color:var(--muted)">${esc(u.email)}</td>
+        <td><span class="rb ${roleClass}">${esc(u.role)}</span></td>
+        <td>
+          <div class="hash-w">
+            <div class="hash-s">${esc(u.hash_truncated)}</div>
+            <div class="hash-tip">${esc(u.hash_full)}</div>
+          </div>
+          <div style="font-size:.62rem;color:var(--muted);margin-top:.12rem">Hover to reveal</div>
+        </td>
+        <td><span class="algo-b">${esc(u.hash_algorithm)}</span></td>
+        <td>
+          <button class="btn-row" onclick="analyzeUser(${uid})" title="Select only this user and start analysis">
+            ▶ Analyze
+          </button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+
+    /* Bind checkboxes */
+    document.querySelectorAll('.user-chk').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        const uid=parseInt(cb.dataset.uid);
+        if(cb.checked) selectedUids.add(uid);
+        else           selectedUids.delete(uid);
+        updateSelectionCount();
+        updateStartBtn();
+        syncSelectAll();
+      });
+    });
+
+    /* Header checkbox */
+    $('chk-all').addEventListener('change', e=>{
+      if(e.target.checked) selectAll(); else deselectAll();
+    });
+  }
+
+  function selectAll() {
+    allUsers.forEach(u=>{ const uid=parseInt(u.id); selectedUids.add(uid); const c=$('chk-'+uid); if(c) c.checked=true; });
+    $('chk-all').checked=true;
+    updateSelectionCount(); updateStartBtn();
+  }
+  function deselectAll() {
+    selectedUids.clear();
+    document.querySelectorAll('.user-chk').forEach(c=>c.checked=false);
+    $('chk-all').checked=false;
+    updateSelectionCount(); updateStartBtn();
+  }
+  function syncSelectAll() {
+    $('chk-all').checked = selectedUids.size===allUsers.length && allUsers.length>0;
+  }
+  function updateSelectionCount() {
+    const n=selectedUids.size;
+    $('tgt-count').textContent=n===0?'0 selected':n===1?'1 account selected':`${n} accounts selected`;
+  }
+  function updateStartBtn() {
+    const n=selectedUids.size;
+    const meta=allProfiles.find(p=>p.key===selectedProfile)||{};
+    const btn=$('btn-start');
+    if(n===0) {
+      btn.disabled=true;
+      btn.textContent='🔓 Start Analysis — Select targets above';
+    } else {
+      btn.disabled=false;
+      btn.textContent=`🔓 Start Analysis — ${n} account(s) · "${meta.name||selectedProfile}" profile`;
+    }
+  }
+
+  /* "Analyze" per-row button: select only this user then start */
+  window.analyzeUser = function(uid) {
+    deselectAll();
+    selectedUids.add(uid);
+    const cb=$('chk-'+uid);
+    if(cb) cb.checked=true;
+    syncSelectAll();
+    updateSelectionCount();
+    updateStartBtn();
+    runAnalysis();
+  };
+
+  /* ─── Profiles ─── */
+  const SEL_CLASS = { green:'sel-g', orange:'sel-o', red:'sel-r' };
+  const FILE_MAP  = { quick:'500-worst-passwords.txt', common:'10k-most-common.txt', breach:'100k-most-used-passwords-NCSC.txt' };
+
+  function renderProfiles(profiles) {
+    const grid=$('profile-grid');
+    grid.innerHTML='';
+    profiles.forEach(p=>{
+      const card=document.createElement('div');
+      card.className='pc';
+      card.dataset.key=p.key;
+      card.innerHTML=`
+        <div class="pc-radio"></div>
+        <div class="pc-name">${esc(p.name)}</div>
+        <div class="pc-count ${p.color[0]}">${p.candidates.toLocaleString()}</div>
+        <div class="pc-desc">${esc(p.description)}</div>
+        <div class="pc-rt">⏱ ${esc(p.runtime_hint)}</div>
+        <div class="pc-ex">${(p.examples||[]).map(e=>`<span class="pc-ex-tag">${esc(e)}</span>`).join('')}</div>`;
+      card.addEventListener('click',()=>selectProfile(p.key));
+      grid.appendChild(card);
+    });
+
+    const tbody=$('cmp-body');
+    tbody.innerHTML='';
+    profiles.forEach(p=>{
+      const tr=document.createElement('tr');
+      tr.id='cmp-'+p.key;
+      tr.innerHTML=`<td><strong>${esc(p.name)}</strong></td>
+        <td style="font-family:var(--mono);font-size:.73rem;color:var(--muted)">${esc(FILE_MAP[p.key]||p.key)}</td>
+        <td style="font-family:var(--mono);color:var(--${p.color})">${p.candidates.toLocaleString()}</td>
+        <td style="font-size:.77rem;color:var(--muted)">${esc(p.runtime_hint)}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    selectProfile('quick');
+  }
+
+  function selectProfile(key) {
+    selectedProfile=key;
+    document.querySelectorAll('.pc').forEach(c=>{
+      const p=allProfiles.find(x=>x.key===c.dataset.key);
+      c.className='pc'+(c.dataset.key===key?' '+(SEL_CLASS[p&&p.color]||'sel-g'):'');
+    });
+    document.querySelectorAll('#cmp-body tr').forEach(tr=>{
+      tr.className=tr.id==='cmp-'+key?'sel-row':'';
+    });
+    updateStartBtn();
+  }
+
+  /* ─── Run analysis ─── */
+  window.runAnalysis = function() {
+    if(!sessionId || selectedUids.size===0 || analysisRunning) return;
+    analysisRunning=true;
+
+    /* UI state */
+    $('btn-start').disabled=true;
+    $('btn-start').innerHTML='<span class="spin"></span> Connecting…';
+    $('btn-stop').classList.add('show');
+    $('prog-wrap').classList.add('show');
+    $('results').style.display='none';
+    $('can-banner').classList.remove('show');
+    setPhase(5);
+    $('cn4').className='cn active';
+
+    /* Reset counters */
+    crackedCount=0; completedAccts=0; totalCandidates=0;
+    $('console-box').innerHTML='';
+    $('ls-cands').textContent='0';
+    $('ls-crack').textContent='0';
+    $('ls-rem').textContent=selectedUids.size;
+    $('ls-acct').textContent='0';
+    addLine('[*] Opening SSE stream…','d');
+
+    /* Timer */
+    elapsedStart=Date.now();
+    timerInterval=setInterval(()=>{
+      $('th-timer').textContent=fmtTime((Date.now()-elapsedStart)/1000);
+    },500);
+
+    const targets=[...selectedUids].join(',');
+    evtSource=new EventSource(
+      `/api/crack/stream?sid=${encodeURIComponent(sessionId)}&profile=${encodeURIComponent(selectedProfile)}&targets=${encodeURIComponent(targets)}`
+    );
+
+    const resultsBuf=[];
+    let finalReport=null;
+
+    evtSource.onmessage=e=>{
+      let ev; try{ ev=JSON.parse(e.data); } catch{ return; }
+      switch(ev.type) {
+
+        case 'start':
+          totalAccounts=ev.total_accounts;
+          wordlistSize=ev.wordlist_size;
+          $('ls-rem').textContent=totalAccounts;
+          $('prog-sub').textContent=`Profile: ${ev.profile_name} · ${totalAccounts} account(s) · ${ev.wordlist_size.toLocaleString()} candidates`;
+          $('th-profile').textContent=`Profile: ${ev.profile_name}`;
+          $('ctrl-hint').textContent=`${ev.wordlist_size.toLocaleString()} candidates per account`;
+          addLine(`[*] ${ev.profile_name} · ${totalAccounts} account(s) · ${ev.wordlist_size.toLocaleString()} candidates`,'ok');
+          break;
+
+        case 'testing': {
+          const pct=Math.min(99,Math.round(
+            ((ev.account_index-1)/totalAccounts + ev.candidate_index/(wordlistSize*totalAccounts))*100
+          ));
+          $('per-fill').style.width=pct+'%';
+          $('per-pct').textContent=pct+'%';
+          $('per-label').textContent=`[${ev.account_index}/${ev.total}] ${ev.username} — #${ev.candidate_index}: ${ev.candidate}`;
+          $('prog-sub').textContent=`Account ${ev.account_index} of ${ev.total}: ${ev.username}`;
+          $('th-user').textContent=ev.username;
+          $('th-cand').textContent='Candidate: '+ev.candidate;
+
+          totalCandidates=(ev.account_index-1)*wordlistSize+ev.candidate_index;
+          $('ls-cands').textContent=totalCandidates.toLocaleString();
+
+          if(ev.candidate_index%100===1)
+            addLine(`    [${ev.account_index}/${ev.total}] ${ev.username} → trying "${ev.candidate}" (#${ev.candidate_index})`,'d');
+          break;
+        }
+
+        case 'result': {
+          const ent=ev.entry;
+          completedAccts++;
+          $('ls-acct').textContent=completedAccts;
+          $('ls-rem').textContent=Math.max(0,totalAccounts-completedAccts);
+          if(ent.status==='cracked'){
+            crackedCount++;
+            $('ls-crack').textContent=crackedCount;
+            addLine(`[+] CRACKED: ${ent.username} → "${ent.recovered_password}" · pos #${ent.candidate_index} · ${ent.time_seconds}s`,'ok');
+          } else {
+            addLine(`[-] not found: ${ent.username} (${ent.time_seconds}s)`,'w');
+          }
+          resultsBuf.push(ent);
+          break;
+        }
+
+        case 'cancelled':
+          evtSource.close(); evtSource=null;
+          clearInterval(timerInterval);
+          analysisRunning=false;
+          $('btn-stop').classList.remove('show');
+          $('btn-start').disabled=false;
+          $('btn-start').innerHTML='🔓 Start Analysis';
+          $('per-label').textContent='Stopped by user.';
+          addLine(`[⏹] Stopped · ${ev.cracked_count} cracked · ${(ev.candidates_tried||0).toLocaleString()} tried · ${ev.elapsed_seconds}s`,'w');
+          showCancelledBanner(ev);
+          break;
+
+        case 'complete':
+          finalReport=ev.report;
+          evtSource.close(); evtSource=null;
+          clearInterval(timerInterval);
+          analysisRunning=false;
+          $('btn-stop').classList.remove('show');
+          $('btn-start').disabled=false;
+          $('btn-start').innerHTML='🔓 Run Again';
+          $('per-fill').style.width='100%';
+          $('per-pct').textContent='100%';
+          $('per-label').textContent='Complete.';
+          addLine(`[*] Done · ${finalReport.cracked_count}/${finalReport.total_accounts} recovered · ${finalReport.total_time_seconds}s`,'ok');
+          setTimeout(()=>renderResults(finalReport),600);
+          break;
+
+        case 'error':
+          evtSource.close(); evtSource=null;
+          clearInterval(timerInterval);
+          analysisRunning=false;
+          $('btn-stop').classList.remove('show');
+          $('btn-start').disabled=false;
+          $('btn-start').innerHTML='🔓 Retry';
+          addLine('[!] Error: '+ev.message,'e');
+          break;
+      }
+    };
+
+    evtSource.onerror=()=>{
+      if(evtSource){ evtSource.close(); evtSource=null; }
+      clearInterval(timerInterval);
+      analysisRunning=false;
+      $('btn-stop').classList.remove('show');
+      $('btn-start').disabled=false;
+      $('btn-start').innerHTML='🔓 Retry';
+      addLine('[!] Connection error.','e');
+    };
+  };
+
+  /* ─── Stop analysis ─── */
+  window.stopAnalysis = async function() {
+    if(!sessionId || !analysisRunning) return;
+    $('btn-stop').textContent='Stopping…';
+    $('btn-stop').disabled=true;
+    try {
+      await fetch(`/api/crack/cancel?sid=${encodeURIComponent(sessionId)}`,{method:'POST'});
+    } catch{ /* ignore – stream will time out */ }
+  };
+
+  function showCancelledBanner(ev) {
+    const elapsed = ev.elapsed_seconds || ((Date.now()-elapsedStart)/1000).toFixed(1);
+    $('can-stats').textContent=
+      `Completed ${ev.completed_accounts||0} account(s) · `+
+      `${ev.cracked_count||0} cracked · `+
+      `${(ev.candidates_tried||0).toLocaleString()} candidates tried · `+
+      `${elapsed}s elapsed`;
+    $('can-banner').classList.add('show');
+    $('btn-stop').disabled=false;
+  }
+
+  /* Reconfigure for another run */
+  window.resetForRerun = function() {
+    $('can-banner').classList.remove('show');
+    $('prog-wrap').classList.remove('show');
+    $('p2').scrollIntoView({behavior:'smooth',block:'start'});
+  };
+
+  /* ─── Render results ─── */
+  function renderResults(report) {
+    $('results').style.display='';
+    setPhase(6);
+    $('cn3').className='cn done';
+    $('cn4').className='cn done';
+
+    const prof=allProfiles.find(p=>p.key===selectedProfile)||{};
+    $('res-sub').textContent=`${report.entries.length} accounts · Profile: ${prof.name||selectedProfile} · ${(report.wordlist_size||0).toLocaleString()} candidates`;
+
+    $('sum-row').innerHTML=`
+      <div class="sum-s"><div class="sum-n total">${report.total_accounts}</div><div class="sum-l">Accounts Analyzed</div></div>
+      <div class="sum-s"><div class="sum-n cracked">${report.cracked_count}</div><div class="sum-l">Passwords Recovered</div></div>
+      <div class="sum-s"><div class="sum-n safe">${report.not_cracked_count}</div><div class="sum-l">Not Cracked</div></div>
+      <div class="sum-s"><div class="sum-n time">${report.total_time_seconds.toFixed(2)}s</div><div class="sum-l">Total Time</div></div>`;
+
+    const list=$('entries-list');
+    list.innerHTML='';
+    report.entries.forEach(entry=>{
+      const c=entry.status==='cracked';
+      const div=document.createElement('div');
+      div.className='entry '+(c?'crk':'nc');
+      div.innerHTML=`
+        <div class="entry-top">
+          <div class="e-user">${esc(entry.username)}</div>
+          <div class="e-badge ${c?'e-c':'e-nc'}">${c?'☠️ CRACKED':'✅ NOT CRACKED'}</div>
+          ${c?`<div class="e-meta">pos #${entry.candidate_index} · ${entry.time_seconds}s</div>`:''}
+        </div>
+        <div class="e-hash"><span style="color:var(--muted);font-size:.68rem">Hash: </span>${esc(entry.hash_truncated)}</div>
+        ${c?`<div class="rec-box">
+          <div class="rec-lbl">⚠️ Recovered</div>
+          <div class="rec-pw">${esc(entry.recovered_password)}</div>
+          <div class="rec-pos">wordlist[${entry.candidate_index}] · ${entry.time_seconds}s</div>
+        </div>`:''}
+        <div class="e-exp">${esc(entry.explanation)}</div>`;
+      list.appendChild(div);
+    });
+
+    /* Education */
+    const edu=report.education||{};
+    const panels=[
+      {t:'🔒 Hashing ≠ Encryption',   c:'var(--cyan)',   b:edu.hashing_vs_encryption},
+      {t:'📖 How the Attack Works',   c:'var(--orange)', b:edu.how_cracked},
+      {t:'☠️ What "Cracked" Means',  c:'var(--red)',    b:edu.cracked_means},
+      {t:'✅ What "Not Cracked" Means',c:'var(--green)', b:edu.not_cracked_means},
+      {t:'🛡️ bcrypt Strength',        c:'var(--accent2)',b:edu.bcrypt_strength},
+      {t:'🔗 Two Separate Phases',    c:'var(--yellow)', b:edu.separate_phases},
+    ];
+    const eg=$('edu-grid');
+    eg.innerHTML='';
+    panels.forEach(p=>{
+      const card=document.createElement('div');
+      card.className='edu-card';
+      card.innerHTML=`<div class="edu-t" style="color:${p.c}">${p.t}</div><div class="edu-b">${esc(p.b||'')}</div>`;
+      eg.appendChild(card);
+    });
+
+    const el=$('edu-lessons'); el.innerHTML='';
+    (edu.lessons||[]).forEach(l=>{ const li=document.createElement('li'); li.textContent=l; el.appendChild(li); });
+
+    const icons=['🎯','🛒','📧','🔑'];
+    const titles=['Credential Stuffing','Dark Web Sale','Targeted Phishing','Internal Pivot'];
+    const ag=$('atk-grid'); ag.innerHTML='';
+    (edu.attacker_actions||[]).forEach((a,i)=>{
+      const item=document.createElement('div');
+      item.className='atk-i';
+      item.innerHTML=`<div class="atk-t">${icons[i]||'→'} ${titles[i]||''}</div><div class="atk-b">${esc(a)}</div>`;
+      ag.appendChild(item);
+    });
+
+    $('key-lesson').innerHTML=`<strong>Key lesson:</strong> ${esc(edu.separate_phases||'')}`;
+    $('sum-row').scrollIntoView({behavior:'smooth',block:'start'});
+  }
+
+})();
+</script>
+</body>
+</html>

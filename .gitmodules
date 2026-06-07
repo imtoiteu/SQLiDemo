@@ -1,0 +1,3 @@
+[submodule "SQL-Injection-Payloads-List"]
+	path = SQL-Injection-Payloads-List
+	url = https://github.com/Ninja-Yubaraj/SQL-Injection-Payloads-List.git

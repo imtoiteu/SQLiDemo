@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel — SQLiLab</title>
+  <meta name="description" content="SQLiLab admin panel: user management, database download, login history." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080b14;
+      --surface:  #0e1324;
+      --surface2: #141928;
+      --border:   #1e2a45;
+      --accent:   #6c63ff;
+      --accent2:  #a78bfa;
+      --cyan:     #22d3ee;
+      --green:    #34d399;
+      --red:      #f87171;
+      --orange:   #fb923c;
+      --yellow:   #fbbf24;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --font:     'Inter', sans-serif;
+      --mono:     'JetBrains Mono', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* Background */
+    .bg-grid {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(108,99,255,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(108,99,255,.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .bg-glow {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(108,99,255,.15), transparent);
+    }
+
+    /* Navbar */
+    .navbar {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(8,11,20,.9);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      max-width: 1400px; margin: 0 auto;
+      padding: 0 1.5rem;
+      display: flex; align-items: center; gap: 1.5rem;
+      height: 60px;
+    }
+    .nav-logo {
+      font-weight: 800; font-size: 1.15rem;
+      color: var(--text); text-decoration: none;
+      display: flex; align-items: center; gap: .4rem;
+      flex-shrink: 0;
+    }
+    .logo-accent { color: var(--accent2); }
+    .nav-links { display: flex; gap: .2rem; list-style: none; flex: 1; flex-wrap: wrap; }
+    .nav-link {
+      padding: .35rem .75rem; border-radius: 6px;
+      color: var(--muted); text-decoration: none; font-size: .82rem;
+      font-weight: 500; transition: color .2s, background .2s; white-space: nowrap;
+    }
+    .nav-link:hover { color: var(--text); background: rgba(108,99,255,.1); }
+    .nav-link.active { color: var(--orange); background: rgba(251,146,60,.1); }
+    .nav-badge {
+      font-size: .72rem; font-weight: 700;
+      padding: .3rem .7rem; border-radius: 20px;
+      background: rgba(251,146,60,.15); color: var(--orange);
+      border: 1px solid rgba(251,146,60,.3);
+      white-space: nowrap; flex-shrink: 0;
+    }
+
+    /* Layout */
+    main {
+      position: relative; z-index: 1;
+      max-width: 1300px; margin: 0 auto;
+      padding: 1.5rem 1.5rem 4rem;
+    }
+
+    /* Access Gate */
+    .access-gate {
+      display: none; text-align: center;
+      padding: 5rem 2rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      margin-bottom: 1.5rem;
+    }
+    .access-gate.show { display: block; }
+    .access-gate .gate-icon { font-size: 4rem; margin-bottom: 1rem; }
+    .access-gate h2 { font-size: 1.6rem; margin-bottom: .5rem; }
+    .access-gate p { color: var(--muted); margin-bottom: 1.5rem; font-size: .9rem; }
+
+    /* Breach Banner */
+    .breach-banner {
+      display: none;
+      align-items: center; gap: 1.25rem;
+      background: rgba(248,113,113,.06);
+      border: 2px solid var(--red);
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+      margin-bottom: 1.5rem;
+      animation: breach-pulse 1.5s ease-in-out infinite;
+    }
+    .breach-banner.show { display: flex; }
+    @keyframes breach-pulse {
+      0%,100% { border-color: var(--red); box-shadow: 0 0 0 0 rgba(248,113,113,.4); }
+      50% { border-color: #ff4444; box-shadow: 0 0 24px rgba(248,113,113,.25); }
+    }
+    .breach-icon { font-size: 2rem; animation: blink 1s ease infinite; }
+    @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:.2; } }
+    .breach-text h3 { color: var(--red); font-size: 1.05rem; font-weight: 800; letter-spacing:.04em; }
+    .breach-text p { color: rgba(248,113,113,.75); font-size: .83rem; margin-top: .2rem; }
+    .breach-actions { margin-left: auto; display: flex; gap: .5rem; flex-wrap: wrap; }
+
+    /* Session bar */
+    .session-bar {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: .85rem 1.25rem;
+      margin-bottom: 1.25rem;
+      align-items: center; gap: 1.25rem; flex-wrap: wrap;
+    }
+    .session-bar.show { display: flex; }
+    .s-label { color: var(--muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .2rem; }
+    .s-val { font-family: var(--mono); font-size: .88rem; color: var(--cyan); }
+    .session-sep { width: 1px; height: 28px; background: var(--border); flex-shrink: 0; }
+    .chip {
+      display: inline-flex; align-items: center; gap: .3rem;
+      padding: .2rem .6rem; border-radius: 20px; font-size: .75rem; font-weight: 700;
+    }
+    .chip-green { background: rgba(52,211,153,.12); color: var(--green); border: 1px solid rgba(52,211,153,.3); }
+    .chip-red { background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+    .chip-orange { background: rgba(251,146,60,.12); color: var(--orange); border: 1px solid rgba(251,146,60,.3); }
+    .chip-purple { background: rgba(108,99,255,.12); color: var(--accent2); border: 1px solid rgba(108,99,255,.3); }
+
+    /* Page heading */
+    .page-heading { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
+    .page-heading h1 { font-size: 1.9rem; font-weight: 800; line-height: 1.2; }
+    .gradient-text {
+      background: linear-gradient(135deg, var(--orange), var(--red));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .page-heading p { color: var(--muted); font-size: .88rem; margin-top: .3rem; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+    .tab-btn {
+      padding: .65rem 1.25rem; background: transparent;
+      border: none; border-bottom: 2px solid transparent;
+      color: var(--muted); font-size: .9rem; font-weight: 600;
+      cursor: pointer; font-family: var(--font);
+      transition: color .2s, border-color .2s;
+      margin-bottom: -1px;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--orange); border-bottom-color: var(--orange); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Panel */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .panel-header {
+      display: flex; align-items: center; gap: .75rem;
+      margin-bottom: 1.1rem; padding-bottom: .9rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-icon { font-size: 1.25rem; }
+    .panel-title { font-size: .98rem; font-weight: 700; }
+    .panel-sub { font-size: .8rem; color: var(--muted); margin-top: .1rem; }
+    .panel-badge {
+      margin-left: auto;
+      padding: .2rem .6rem; border-radius: 6px; font-size: .72rem; font-weight: 700;
+    }
+    .badge-danger { background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.25); }
+    .badge-info { background: rgba(108,99,255,.12); color: var(--accent2); border: 1px solid rgba(108,99,255,.25); }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .55rem 1.1rem; border-radius: 8px; font-size: .85rem;
+      font-family: var(--font); font-weight: 600; cursor: pointer;
+      border: 1px solid transparent; transition: all .2s;
+      text-decoration: none; white-space: nowrap;
+    }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:hover { background: #5a52e0; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(108,99,255,.4); }
+    .btn-ghost { background: transparent; color: var(--text); border-color: var(--border); }
+    .btn-ghost:hover { background: var(--surface2); border-color: var(--accent2); color: var(--accent2); }
+    .btn-success { background: rgba(52,211,153,.12); color: var(--green); border-color: rgba(52,211,153,.3); }
+    .btn-success:hover { background: rgba(52,211,153,.2); }
+    .btn-danger { background: rgba(248,113,113,.1); color: var(--red); border-color: rgba(248,113,113,.3); }
+    .btn-danger:hover { background: rgba(248,113,113,.2); }
+    .btn-orange { background: rgba(251,146,60,.12); color: var(--orange); border-color: rgba(251,146,60,.3); }
+    .btn-orange:hover { background: rgba(251,146,60,.22); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; transform: none !important; }
+    .btn-sm { padding: .35rem .7rem; font-size: .78rem; }
+
+    /* Action bar */
+    .action-bar { display: flex; align-items: center; gap: .65rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
+
+    /* Terminal table */
+    .terminal-wrap {
+      background: #050810;
+      border: 1px solid rgba(52,211,153,.2);
+      border-radius: 10px; overflow: auto;
+      font-family: var(--mono); position: relative;
+    }
+    .terminal-wrap::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,.07) 3px, rgba(0,0,0,.07) 4px);
+    }
+    .terminal-topbar {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .65rem 1rem;
+      border-bottom: 1px solid rgba(52,211,153,.15);
+      background: rgba(52,211,153,.04);
+    }
+    .term-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .term-dot.r { background: #f87171; }
+    .term-dot.y { background: #fbbf24; }
+    .term-dot.g { background: #34d399; }
+    .term-cmd { font-size: .75rem; color: rgba(52,211,153,.55); margin-left: .5rem; }
+
+    /* Data table (admin-themed, not terminal) */
+    .data-table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    .data-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+    .data-table th {
+      padding: .6rem 1rem; text-align: left;
+      background: var(--surface2); color: var(--muted);
+      font-size: .72rem; text-transform: uppercase; letter-spacing: .07em;
+      border-bottom: 1px solid var(--border); font-weight: 700;
+      position: sticky; top: 0;
+    }
+    .data-table td {
+      padding: .6rem 1rem;
+      border-bottom: 1px solid rgba(30,42,69,.6);
+      vertical-align: middle;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: rgba(108,99,255,.04); }
+
+    /* Terminal table */
+    .term-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+    .term-table th {
+      padding: .55rem 1rem; text-align: left;
+      color: var(--green); text-transform: uppercase; letter-spacing: .07em; font-size: .7rem;
+      border-bottom: 1px solid rgba(52,211,153,.15);
+      position: sticky; top: 0; background: #050810;
+    }
+    .term-table td {
+      padding: .5rem 1rem; color: rgba(52,211,153,.82);
+      border-bottom: 1px solid rgba(52,211,153,.06); vertical-align: middle;
+    }
+    .term-table tr:last-child td { border-bottom: none; }
+    .term-table tr:hover td { background: rgba(52,211,153,.04); color: var(--green); }
+
+    /* Hash display */
+    .hash-cell { max-width: 200px; }
+    .hash-short {
+      display: inline-block; max-width: 150px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      cursor: help; vertical-align: middle;
+    }
+    .bcrypt-badge {
+      display: inline-block; margin-left: .35rem;
+      padding: .08rem .35rem; border-radius: 3px; font-size: .65rem; font-weight: 700;
+      background: rgba(108,99,255,.15); color: var(--accent2);
+      border: 1px solid rgba(108,99,255,.25); vertical-align: middle;
+    }
+
+    /* Role badges */
+    .role-badge { display: inline-block; padding: .15rem .5rem; border-radius: 4px; font-size: .75rem; font-weight: 700; }
+    .role-admin    { background: rgba(248,113,113,.15); color: var(--red);    border: 1px solid rgba(248,113,113,.3); }
+    .role-teacher  { background: rgba(251,146,60,.15);  color: var(--orange); border: 1px solid rgba(251,146,60,.3); }
+    .role-student,
+    .role-user     { background: rgba(108,99,255,.15);  color: var(--accent2); border: 1px solid rgba(108,99,255,.3); }
+
+    /* State boxes */
+    .state-box { text-align: center; padding: 2.5rem 1rem; color: var(--muted); font-size: .88rem; }
+    .state-box .state-icon { font-size: 2.2rem; margin-bottom: .6rem; }
+
+    /* Scroll */
+    .scroll-y { max-height: 440px; overflow-y: auto; }
+    .scroll-y::-webkit-scrollbar { width: 4px; }
+    .scroll-y::-webkit-scrollbar-track { background: transparent; }
+    .scroll-y::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* Edu notice */
+    .edu-notice {
+      margin-top: 1rem; padding: .8rem 1.1rem; border-radius: 8px;
+      background: rgba(108,99,255,.07); border: 1px solid rgba(108,99,255,.18);
+      font-size: .83rem; color: var(--accent2);
+      display: flex; align-items: flex-start; gap: .6rem; line-height: 1.5;
+    }
+    .edu-notice strong { color: var(--text); }
+
+    /* Grid of callouts */
+    .callout-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: 1rem; }
+    .callout { border-radius: 10px; padding: 1rem 1.15rem; border-left: 3px solid; }
+    .callout-green { background: rgba(52,211,153,.06); border-color: var(--green); }
+    .callout-red { background: rgba(248,113,113,.06); border-color: var(--red); }
+    .callout-orange { background: rgba(251,146,60,.06); border-color: var(--orange); }
+    .callout h4 { font-size: .85rem; font-weight: 700; margin-bottom: .3rem; }
+    .callout-green h4 { color: var(--green); }
+    .callout-red h4 { color: var(--red); }
+    .callout-orange h4 { color: var(--orange); }
+    .callout p { font-size: .8rem; color: var(--muted); line-height: 1.5; }
+
+    /* History row colors */
+    .row-inject td { background: rgba(248,113,113,.06) !important; }
+    .row-inject td:first-child { border-left: 3px solid var(--red); }
+    .row-success td { background: rgba(52,211,153,.04) !important; }
+    .row-normal td { }
+
+    /* Download section */
+    .download-section {
+      display: flex; align-items: center; gap: 1.5rem;
+      background: linear-gradient(135deg, rgba(248,113,113,.08), rgba(251,146,60,.06));
+      border: 1px solid rgba(248,113,113,.25);
+      border-radius: 14px; padding: 1.5rem 2rem; flex-wrap: wrap;
+    }
+    .download-icon { font-size: 3.5rem; }
+    .download-info { flex: 1; }
+    .download-info h3 { font-size: 1.1rem; font-weight: 800; color: var(--orange); margin-bottom: .35rem; }
+    .download-info p { font-size: .85rem; color: var(--muted); line-height: 1.5; }
+    .download-actions { display: flex; flex-direction: column; gap: .65rem; align-items: flex-end; }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid rgba(108,99,255,.3);
+      border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: .8rem 1.1rem;
+      font-size: .85rem; color: var(--text);
+      transform: translateY(120%); opacity: 0;
+      transition: all .3s; box-shadow: 0 8px 32px rgba(0,0,0,.5);
+      max-width: 340px;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: var(--green); color: var(--green); }
+    .toast.error   { border-color: var(--red); color: var(--red); }
+    .toast.info    { border-color: var(--accent2); color: var(--accent2); }
+
+    /* Confirm dialog */
+    .overlay {
+      display: none; position: fixed; inset: 0; z-index: 1000;
+      background: rgba(8,11,20,.85); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center;
+    }
+    .overlay.show { display: flex; }
+    .dialog {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 2rem; max-width: 420px; width: 90%;
+      box-shadow: 0 24px 64px rgba(0,0,0,.6);
+    }
+    .dialog h3 { font-size: 1.1rem; font-weight: 800; margin-bottom: .5rem; }
+    .dialog p { color: var(--muted); font-size: .88rem; line-height: 1.5; margin-bottom: 1.25rem; }
+    .dialog-btns { display: flex; gap: .65rem; justify-content: flex-end; }
+
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      main { padding: 1rem 1rem 3rem; }
+      .breach-actions { width: 100%; margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="bg-glow" aria-hidden="true"></div>
+
+<!-- Navbar -->
+<nav class="navbar" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">
+      <span>⚡</span>
+      <span>SQLi<span class="logo-accent">Lab</span></span>
+    </a>
+    <ul class="nav-links" role="list">
+      <li><a href="/" class="nav-link">Home</a></li>
+      <li><a href="/register" class="nav-link">Register</a></li>
+      <li><a href="/login" class="nav-link">Login</a></li>
+      <li><a href="/inspector" class="nav-link">Inspector</a></li>
+      <li><a href="/dashboard" class="nav-link">Dashboard</a></li>
+      <li><a href="/admin" class="nav-link active">Admin Panel</a></li>
+    </ul>
+    <span class="nav-badge" id="nav-role-badge">⚙ Admin</span>
+  </div>
+</nav>
+
+<main>
+
+  <!-- Access Gate (not logged in) -->
+  <div class="access-gate" id="access-gate">
+    <div class="gate-icon">🔐</div>
+    <h2>Access Restricted</h2>
+    <p>This panel is accessible to <strong>admin/teacher</strong> accounts,<br>
+       or sessions that have successfully performed a <strong>SQL injection bypass</strong>.</p>
+    <div style="display:flex;gap:.65rem;justify-content:center;flex-wrap:wrap;margin-top:.5rem">
+      <a href="/login" class="btn btn-primary">→ Login as Admin</a>
+      <a href="/login" class="btn btn-danger">⚡ Try SQL Injection</a>
+    </div>
+  </div>
+
+  <!-- Breach Banner -->
+  <div class="breach-banner" id="breach-banner" role="alert">
+    <div class="breach-icon">☠️</div>
+    <div class="breach-text">
+      <h3>⚠ BREACH DETECTED — SQL INJECTION BYPASS ACTIVE</h3>
+      <p>This session was authenticated via SQL injection. Database access has been elevated.</p>
+    </div>
+    <div class="breach-actions">
+      <button class="btn btn-danger btn-sm" id="breach-download-btn">💾 Download DB</button>
+    </div>
+  </div>
+
+  <!-- Session Bar -->
+  <div class="session-bar" id="session-bar">
+    <div>
+      <div class="s-label">User</div>
+      <div class="s-val" id="sb-user">—</div>
+    </div>
+    <div class="session-sep"></div>
+    <div>
+      <div class="s-label">Role</div>
+      <div id="sb-role">—</div>
+    </div>
+    <div class="session-sep"></div>
+    <div>
+      <div class="s-label">Bypass</div>
+      <div id="sb-bypass">—</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:.5rem">
+      <a href="/dashboard" class="btn btn-ghost" style="font-size:.8rem;padding:.35rem .8rem">← Dashboard</a>
+      <button class="btn btn-ghost" id="logout-btn" style="font-size:.8rem;padding:.35rem .8rem">Logout</button>
+    </div>
+  </div>
+
+  <!-- Page heading -->
+  <div class="page-heading" id="main-content" style="display:none">
+    <div>
+      <h1>Admin <span class="gradient-text">Control Panel</span></h1>
+      <p>User management · Database access · Login history · Demo controls</p>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="main-tabs" style="display:none">
+    <button class="tab-btn active" data-tab="users">👥 Users</button>
+    <button class="tab-btn" data-tab="download">💾 Download DB</button>
+    <button class="tab-btn" data-tab="history">📋 Login History</button>
+    <button class="tab-btn" data-tab="controls">⚙ Demo Controls</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB 1 — USER MANAGEMENT
+  ═══════════════════════════════════════════ -->
+  <div class="tab-panel active" id="tab-users">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-icon">🗃️</span>
+        <div>
+          <div class="panel-title">User Database</div>
+          <div class="panel-sub" id="users-panel-sub">Loading…</div>
+        </div>
+        <span class="panel-badge badge-danger">⚠ SENSITIVE</span>
+      </div>
+
+      <!-- DB Mode Banner + Toggle -->
+      <div id="db-mode-banner" style="margin-bottom:.85rem;padding:.6rem .9rem;border-radius:8px;border:1px solid;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+        <span id="db-mode-icon" style="font-size:1.1rem"></span>
+        <div style="flex:1">
+          <div id="db-mode-label" style="font-weight:800;font-size:.83rem"></div>
+          <div id="db-mode-desc" style="font-size:.72rem;color:var(--muted)"></div>
+        </div>
+        <div style="display:flex;gap:.4rem">
+          <button class="btn btn-sm" id="switch-legacy-btn" onclick="setDbMode('legacy')">📟 Legacy DB</button>
+          <button class="btn btn-sm" id="switch-modern-btn" onclick="setDbMode('modern')">🔒 Modern DB</button>
+        </div>
+      </div>
+
+      <div class="action-bar">
+        <button class="btn btn-primary" id="fetch-users-btn">⚡ Load Users</button>
+        <button class="btn btn-ghost" id="refresh-users-btn">↻ Refresh</button>
+        <button class="btn btn-success" id="seed-btn">👥 Seed Sample Users</button>
+        <div id="user-count-info" style="margin-left:auto;color:var(--muted);font-size:.82rem;display:none">
+          <span id="user-count">0</span> users in database
+        </div>
+      </div>
+
+      <!-- Terminal-style table -->
+      <div class="terminal-wrap">
+        <div class="terminal-topbar">
+          <div class="term-dot r"></div><div class="term-dot y"></div><div class="term-dot g"></div>
+          <span class="term-cmd" id="term-cmd-label">sqlilab@db:~$ SELECT …</span>
+        </div>
+        <div class="scroll-y">
+          <div id="users-state" class="state-box">
+            <div class="state-icon">💤</div>
+            <div>Click <strong style="color:var(--accent)">Load Users</strong> to query the database</div>
+          </div>
+          <table class="term-table" id="users-table" style="display:none">
+            <thead>
+              <tr id="users-thead-row"></tr>
+            </thead>
+            <tbody id="users-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="edu-notice" id="users-edu-notice">
+        <span>🛡️</span>
+        <span id="users-edu-text">
+          <strong>Even with full DB access, bcrypt hashes are safe.</strong>
+          Each hash is one-way and salted — reversing it requires brute-forcing ~2<sup>12</sup> iterations per guess.
+        </span>
+      </div>
+
+      <div class="callout-grid" id="users-callouts">
+        <div class="callout callout-green">
+          <h4>✅ What bcrypt protects</h4>
+          <p>Attacker gets the hash but cannot derive the original password. Each hash has a unique random salt embedded.</p>
+        </div>
+        <div class="callout callout-red">
+          <h4>❌ What is exposed</h4>
+          <p>Usernames, emails, and roles are visible. This enables phishing, credential stuffing, and social engineering.</p>
+        </div>
+        <div class="callout callout-orange">
+          <h4>📖 Lesson</h4>
+          <p>Always use bcrypt/argon2. Never store plaintext. Even a full DB leak is survivable if hashing is done right.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB 2 — DOWNLOAD DATABASE
+  ═══════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-download">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-icon">💾</span>
+        <div>
+          <div class="panel-title">Download SQLite Database</div>
+          <div class="panel-sub">Simulating what an attacker gains from a file-read exploit</div>
+        </div>
+        <span class="panel-badge badge-danger">⚠ BREACH SIM</span>
+      </div>
+
+      <div class="download-section">
+        <div class="download-icon">🗄️</div>
+        <div class="download-info">
+          <h3>sqlilab_breached.db</h3>
+          <p>
+            The full SQLite database file, including:<br>
+            • <strong>users</strong> table — IDs, usernames, emails, bcrypt hashes, roles<br>
+            • <strong>login_attempts</strong> table — all authentication attempts<br>
+            • <strong>app_settings</strong> table — global configuration<br>
+            <br>
+            <em style="color:var(--green)">🔐 Passwords are bcrypt-hashed — they cannot be reversed from this file alone.</em>
+          </p>
+        </div>
+        <div class="download-actions">
+          <button class="btn btn-orange" id="download-db-btn" style="font-size:1rem;padding:.75rem 1.5rem">
+            ⬇ Download .db File
+          </button>
+          <span style="font-size:.75rem;color:var(--muted);text-align:right">Only available to admin<br>or post-injection sessions</span>
+        </div>
+      </div>
+
+      <div style="margin-top:1.5rem">
+        <div class="panel" style="margin-bottom:0;background:var(--surface2)">
+          <div class="panel-header" style="margin-bottom:.75rem;padding-bottom:.75rem">
+            <span class="panel-icon">🔍</span>
+            <div>
+              <div class="panel-title">What's inside the .db file?</div>
+            </div>
+          </div>
+          <pre style="font-family:var(--mono);font-size:.78rem;color:var(--green);background:#050810;padding:1rem;border-radius:8px;border:1px solid rgba(52,211,153,.15);overflow-x:auto">
+-- users table
+CREATE TABLE users (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  username      TEXT NOT NULL UNIQUE,
+  email         TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,       -- bcrypt $2b$12$...
+  role          TEXT NOT NULL,
+  created_at    TEXT NOT NULL
+);
+
+-- login_attempts (all attack history)
+CREATE TABLE login_attempts (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  username    TEXT,
+  password    TEXT,
+  mode        TEXT,
+  is_injection INTEGER,
+  success      INTEGER,
+  timestamp   TEXT DEFAULT CURRENT_TIMESTAMP
+);</pre>
+          <div class="edu-notice" style="margin-top:1rem">
+            <span>💡</span>
+            <span>Open the .db file in <a href="https://sqlitebrowser.org/" target="_blank" rel="noopener" style="color:var(--cyan);text-decoration:underline">DB Browser for SQLite</a> or use <code style="font-family:var(--mono);color:var(--accent2)">sqlite3 sqlilab_breached.db</code> in terminal to explore its contents.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB 3 — LOGIN HISTORY
+  ═══════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-history">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-icon">📋</span>
+        <div>
+          <div class="panel-title">Login Attempt History</div>
+          <div class="panel-sub">All authentication attempts — including injection attacks</div>
+        </div>
+        <span class="panel-badge badge-info">AUDIT LOG</span>
+      </div>
+
+      <div class="action-bar">
+        <button class="btn btn-primary" id="load-history-btn">📋 Load History</button>
+        <button class="btn btn-ghost" id="refresh-history-btn">↻ Refresh</button>
+        <div id="history-count-info" style="margin-left:auto;color:var(--muted);font-size:.82rem;display:none">
+          <span id="history-count">0</span> records
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div style="display:flex;gap:.75rem;margin-bottom:.85rem;flex-wrap:wrap">
+        <span style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--muted)">
+          <span style="width:12px;height:12px;background:rgba(248,113,113,.3);border-radius:3px;display:inline-block"></span> Injection detected
+        </span>
+        <span style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--muted)">
+          <span style="width:12px;height:12px;background:rgba(52,211,153,.15);border-radius:3px;display:inline-block"></span> Successful login
+        </span>
+        <span style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--muted)">
+          <span style="width:12px;height:12px;background:rgba(30,42,69,.4);border-radius:3px;display:inline-block"></span> Failed attempt
+        </span>
+      </div>
+
+      <div class="data-table-wrap">
+        <div class="scroll-y">
+          <div id="history-state" class="state-box">
+            <div class="state-icon">📂</div>
+            <div>Click <strong style="color:var(--accent)">Load History</strong> to view login audit log</div>
+          </div>
+          <table class="data-table" id="history-table" style="display:none">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Timestamp</th>
+                <th>Username</th>
+                <th>Password Attempted</th>
+                <th>Mode</th>
+                <th>Injection</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody id="history-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       TAB 4 — DEMO CONTROLS (admin only)
+  ═══════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-controls">
+
+    <!-- Global Mode Toggle -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-icon">🌐</span>
+        <div>
+          <div class="panel-title">Global Demo Mode</div>
+          <div class="panel-sub">Controls which login mode all users see by default</div>
+        </div>
+        <span class="panel-badge badge-info" id="current-mode-badge">Loading…</span>
+      </div>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap">
+        <button class="btn btn-danger" id="set-vulnerable-btn" style="flex:1;justify-content:center;padding:.85rem">
+          🔓 Set VULNERABLE Mode
+        </button>
+        <button class="btn btn-success" id="set-secure-btn" style="flex:1;justify-content:center;padding:.85rem">
+          🛡 Set SECURE Mode
+        </button>
+      </div>
+      <div class="edu-notice" style="margin-top:1rem">
+        <span>ℹ️</span>
+        <span>In <strong>Vulnerable Mode</strong>, the login page uses raw string concatenation SQL — susceptible to injection. In <strong>Secure Mode</strong>, parameterised queries are enforced — injection is structurally impossible.</span>
+      </div>
+    </div>
+
+    <!-- Database Controls -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-icon">🗄️</span>
+        <div>
+          <div class="panel-title">Database Management</div>
+          <div class="panel-sub">Reset, seed, or export the demo database</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem">
+        <button class="btn btn-success" id="seed-controls-btn" style="justify-content:center;padding:.85rem">
+          👥 Seed Sample Users
+        </button>
+        <button class="btn btn-orange" id="export-btn" style="justify-content:center;padding:.85rem">
+          💾 Export Database
+        </button>
+        <button class="btn btn-danger" id="reset-btn" style="justify-content:center;padding:.85rem">
+          🔄 Reset Database
+        </button>
+      </div>
+      <div class="edu-notice" style="margin-top:1rem">
+        <span>⚠️</span>
+        <span><strong>Reset</strong> drops all tables, recreates schema, and re-seeds the admin account. Use before classroom demos to start with a clean state.</span>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<!-- Toast -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- Confirm Dialog -->
+<div class="overlay" id="confirm-overlay">
+  <div class="dialog">
+    <h3 id="confirm-title">Confirm Action</h3>
+    <p id="confirm-msg">Are you sure?</p>
+    <div class="dialog-btns">
+      <button class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+      <button class="btn btn-danger" id="confirm-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const $ = id => document.getElementById(id);
+  let toastTimer = null;
+  let currentUser = null;
+  let pendingAction = null;
+
+  /* ─── Toast ─── */
+  function toast(msg, type = '') {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.className = 'toast'; }, 3500);
+  }
+
+  /* ─── Confirm Dialog ─── */
+  function confirm(title, msg, onOk) {
+    $('confirm-title').textContent = title;
+    $('confirm-msg').textContent = msg;
+    pendingAction = onOk;
+    $('confirm-overlay').classList.add('show');
+  }
+  $('confirm-cancel').addEventListener('click', () => {
+    $('confirm-overlay').classList.remove('show');
+    pendingAction = null;
+  });
+  $('confirm-ok').addEventListener('click', () => {
+    $('confirm-overlay').classList.remove('show');
+    if (pendingAction) { pendingAction(); pendingAction = null; }
+  });
+
+  /* ─── Helpers ─── */
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function fmtDate(s) {
+    if (!s) return '—';
+    try { return new Date(s).toLocaleString(); } catch { return s; }
+  }
+
+  function truncHash(h, n = 24) {
+    if (!h) return '—';
+    return h.length > n ? h.slice(0, n) + '…' : h;
+  }
+
+  function roleBadge(role) {
+    const r = (role || '').toLowerCase();
+    const cls = r === 'admin' ? 'role-admin' : r === 'teacher' ? 'role-teacher' : 'role-user';
+    return `<span class="role-badge ${cls}">${esc(role || '?')}</span>`;
+  }
+
+  /* ─── Tabs ─── */
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      $('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  /* ─── Session ─── */
+  async function loadSession() {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (!res.ok) {
+        $('access-gate').classList.add('show');
+        return;
+      }
+      const user = await res.json();
+      currentUser = user;
+
+      const role = (user.role || '').toLowerCase();
+      const bypass = user.injection_bypass || user.bypass || false;
+      const isAdmin = role === 'admin' || role === 'teacher';
+
+      if (!isAdmin && !bypass) {
+        $('access-gate').classList.add('show');
+        return;
+      }
+
+      // Show main UI
+      $('session-bar').classList.add('show');
+      $('main-content').style.display = 'block';
+      $('main-tabs').style.display = 'flex';
+
+      $('sb-user').textContent = user.username || '—';
+
+      $('sb-role').innerHTML = roleBadge(user.role);
+
+      $('sb-bypass').innerHTML = bypass
+        ? '<span class="chip chip-red">☠ Injection Bypass</span>'
+        : '<span class="chip chip-green">✓ Normal Login</span>';
+
+      if (bypass) {
+        $('breach-banner').classList.add('show');
+        $('nav-role-badge').textContent = '☠ Breach Session';
+        $('nav-role-badge').style.background = 'rgba(248,113,113,.15)';
+        $('nav-role-badge').style.color = 'var(--red)';
+        $('nav-role-badge').style.borderColor = 'rgba(248,113,113,.3)';
+      } else if (role === 'admin') {
+        $('nav-role-badge').textContent = '🔑 Admin';
+      } else if (role === 'teacher') {
+        $('nav-role-badge').textContent = '🎓 Teacher';
+        $('nav-role-badge').style.background = 'rgba(251,146,60,.15)';
+        $('nav-role-badge').style.color = 'var(--orange)';
+        $('nav-role-badge').style.borderColor = 'rgba(251,146,60,.3)';
+      }
+
+      // Hide demo controls tab for non-admin injection-bypass users
+      if (!isAdmin) {
+        document.querySelector('[data-tab="controls"]').style.display = 'none';
+      }
+
+      loadGlobalMode();
+
+      // Auto-select the right DB view based on how the user logged in
+      const mode = (user.login_mode || 'modern') === 'legacy' ? 'legacy' : 'modern';
+      setDbMode(mode);
+    } catch {
+      $('access-gate').classList.add('show');
+    }
+  }
+
+  /* ─── DB Mode Toggle ─── */
+  let currentDbMode = 'modern';
+
+  window.setDbMode = function(mode) {
+    currentDbMode = mode;
+    const banner = $('db-mode-banner');
+    const legBtn = $('switch-legacy-btn');
+    const modBtn = $('switch-modern-btn');
+
+    // Reset table state
+    $('users-state').innerHTML = '<div class="state-icon">💤</div><div>Click <strong style="color:var(--accent)">Load Users</strong> to query the database</div>';
+    $('users-state').style.display = 'block';
+    $('users-table').style.display = 'none';
+    $('user-count-info').style.display = 'none';
+
+    if (mode === 'legacy') {
+      banner.style.borderColor = 'rgba(248,113,113,.4)';
+      banner.style.background = 'rgba(248,113,113,.05)';
+      $('db-mode-icon').textContent = '📟';
+      $('db-mode-label').innerHTML = 'Demo 1 — <code style="font-family:var(--mono)">legacy_users</code> table <span style="color:var(--red);font-weight:900">[PLAINTEXT passwords]</span>';
+      $('db-mode-desc').textContent = 'This table is used by the Legacy App (Demo 1). Passwords are stored as plaintext — directly visible after any DB breach.';
+      legBtn.className = 'btn btn-sm btn-danger';
+      modBtn.className = 'btn btn-sm btn-ghost';
+      $('users-panel-sub').textContent = 'legacy_users table — plaintext passwords (Demo 1)';
+      $('term-cmd-label').textContent = 'sqlilab@db:~$ SELECT id, username, password, role FROM legacy_users;';
+      $('users-edu-text').innerHTML = '<strong style="color:var(--red)">⚠️ Plaintext storage is catastrophic.</strong> Every password is immediately readable after a DB breach — no cracking needed. This is why Demo 1 exists: to show what NOT to do.';
+      $('users-callouts').innerHTML = `
+        <div class="callout callout-red">
+          <h4>☠️ Plaintext passwords exposed</h4>
+          <p>All 4 accounts have their passwords visible in clear text. The attacker reads them directly — no dictionary attack, no GPU cracking.</p>
+        </div>
+        <div class="callout callout-orange">
+          <h4>📖 Lesson</h4>
+          <p>Never store passwords in plaintext. Even salted MD5 is better than this. Use bcrypt, argon2, or scrypt.</p>
+        </div>
+        <div class="callout callout-green">
+          <h4>✅ Compare with Demo 2</h4>
+          <p>Switch to Modern DB to see how bcrypt makes the same breach survivable — hashes cannot be reversed.</p>
+        </div>`;
+      fetchUsers(); // auto-load
+    } else {
+      banner.style.borderColor = 'rgba(52,211,153,.3)';
+      banner.style.background = 'rgba(52,211,153,.04)';
+      $('db-mode-icon').textContent = '🔒';
+      $('db-mode-label').innerHTML = 'Demo 2 — <code style="font-family:var(--mono)">users</code> table <span style="color:var(--green);font-weight:900">[bcrypt hashes]</span>';
+      $('db-mode-desc').textContent = 'This table is used by the Modern App (Demo 2). Passwords are bcrypt-hashed — unreadable without cracking.';
+      modBtn.className = 'btn btn-sm btn-success';
+      legBtn.className = 'btn btn-sm btn-ghost';
+      $('users-panel-sub').textContent = 'users table — bcrypt hashed passwords (Demo 2)';
+      $('term-cmd-label').textContent = 'sqlilab@db:~$ SELECT id, username, email, password_hash, role, created_at FROM users;';
+      $('users-edu-text').innerHTML = '<strong>Even with full DB access, bcrypt hashes are safe.</strong> Each hash is one-way and salted — reversing it requires brute-forcing ~2<sup>12</sup> iterations per guess.';
+      $('users-callouts').innerHTML = `
+        <div class="callout callout-green">
+          <h4>✅ What bcrypt protects</h4>
+          <p>Attacker gets the hash but cannot derive the original password. Each hash has a unique random salt embedded.</p>
+        </div>
+        <div class="callout callout-red">
+          <h4>❌ What is exposed</h4>
+          <p>Usernames, emails, and roles are visible. This enables phishing, credential stuffing, and social engineering.</p>
+        </div>
+        <div class="callout callout-orange">
+          <h4>📖 Lesson</h4>
+          <p>Always use bcrypt/argon2. Never store plaintext. Even a full DB leak is survivable if hashing is done right.</p>
+        </div>`;
+    }
+  };
+
+  async function fetchUsers() {
+    if (currentDbMode === 'legacy') { fetchLegacyUsers(); return; }
+    const btn = $('fetch-users-btn');
+    const state = $('users-state');
+    const table = $('users-table');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Loading…';
+    state.innerHTML = '<div class="state-icon">⏳</div><div>Querying users table…</div>';
+    state.style.display = 'block'; table.style.display = 'none';
+    try {
+      const res = await fetch('/api/admin/users');
+      if (!res.ok) throw new Error((await res.json().catch(()=>{})).error || 'Failed');
+      const data = await res.json();
+      renderModernUsers(data.users || []);
+      toast(`Loaded ${(data.users||[]).length} users from users table`, 'success');
+    } catch (err) {
+      state.innerHTML = `<div class="state-icon">⚠️</div><div style="color:var(--red)">${err.message}</div>`;
+      toast(err.message, 'error');
+    } finally { btn.disabled = false; btn.innerHTML = '⚡ Load Users'; }
+  }
+
+  async function fetchLegacyUsers() {
+    const btn = $('fetch-users-btn');
+    const state = $('users-state');
+    const table = $('users-table');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Loading…';
+    state.innerHTML = '<div class="state-icon">⏳</div><div>Querying legacy_users table…</div>';
+    state.style.display = 'block'; table.style.display = 'none';
+    try {
+      const res = await fetch('/api/admin/exposed-legacy-data');
+      if (!res.ok) throw new Error((await res.json().catch(()=>{})).error || 'Failed');
+      const data = await res.json();
+      renderLegacyUsers(data.rows || []);
+      toast(`Loaded ${(data.rows||[]).length} accounts from legacy_users table`, 'success');
+    } catch (err) {
+      state.innerHTML = `<div class="state-icon">⚠️</div><div style="color:var(--red)">${err.message}</div>`;
+      toast(err.message, 'error');
+    } finally { btn.disabled = false; btn.innerHTML = '⚡ Load Users'; }
+  }
+
+  function renderLegacyUsers(users) {
+    const tbody = $('users-tbody');
+    const state = $('users-state');
+    const table = $('users-table');
+    const meta  = $('user-count-info');
+    $('users-thead-row').innerHTML =
+      '<th>ID</th><th>Username</th>' +
+      '<th style="color:var(--red)">Password <span style="font-size:.6rem;font-weight:800;background:rgba(248,113,113,.15);color:var(--red);border:1px solid rgba(248,113,113,.25);padding:.02rem .25rem;border-radius:3px">PLAINTEXT</span></th>' +
+      '<th>Role</th><th>Email</th>';
+    if (!users.length) {
+      state.innerHTML = '<div class="state-icon">🚫</div><div>No accounts in legacy_users</div>';
+      return;
+    }
+    tbody.innerHTML = users.map(u => `<tr>
+      <td style="color:var(--muted)">${esc(u.id)}</td>
+      <td style="color:var(--cyan);font-weight:600">${esc(u.username||'—')}</td>
+      <td><span style="color:var(--red);font-weight:700;font-family:var(--mono)">${esc(u.password||'—')}</span>
+          <span style="margin-left:.3rem;padding:.04rem .3rem;border-radius:3px;font-size:.6rem;font-weight:800;background:rgba(248,113,113,.15);color:var(--red);border:1px solid rgba(248,113,113,.25)">PLAINTEXT</span></td>
+      <td>${roleBadge(u.role)}</td>
+      <td style="color:var(--muted);font-size:.76rem">${esc(u.email||'—')}</td>
+    </tr>`).join('');
+    state.style.display = 'none'; table.style.display = 'table';
+    meta.style.display = 'block'; $('user-count').textContent = users.length;
+  }
+
+  function renderModernUsers(users) {
+    const tbody = $('users-tbody');
+    const state = $('users-state');
+    const table = $('users-table');
+    const meta  = $('user-count-info');
+    $('users-thead-row').innerHTML =
+      '<th>ID</th><th>Username</th><th>Email</th><th>Password Hash</th><th>Role</th><th>Created</th><th>Actions</th>';
+    if (!users.length) {
+      state.innerHTML = '<div class="state-icon">🚫</div><div>No users in database</div>';
+      return;
+    }
+    const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'teacher');
+    tbody.innerHTML = users.map(u => {
+      const canDelete = u.id !== 1 && isAdmin;
+      return `<tr>
+        <td style="color:var(--muted)">${esc(u.id)}</td>
+        <td style="color:var(--cyan);font-weight:600">${esc(u.username||'—')}</td>
+        <td>${esc(u.email||'—')}</td>
+        <td class="hash-cell">
+          <span class="hash-short" title="${esc(u.password_hash||'')}">${esc(truncHash(u.password_hash||'—'))}</span>
+          <span class="bcrypt-badge">BCRYPT</span>
+        </td>
+        <td>${roleBadge(u.role)}</td>
+        <td style="color:var(--muted);font-size:.73rem">${esc(fmtDate(u.created_at))}</td>
+        <td>${canDelete
+          ? `<button class="btn btn-danger btn-sm delete-user-btn" data-id="${u.id}" data-name="${esc(u.username)}">🗑 Delete</button>`
+          : '<span style="color:var(--muted);font-size:.78rem">—</span>'
+        }</td>
+      </tr>`;
+    }).join('');
+    tbody.querySelectorAll('.delete-user-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id; const name = btn.dataset.name;
+        confirm('Delete User', `Delete user "${name}" (ID ${id})? This cannot be undone.`, () => deleteUser(id));
+      });
+    });
+    state.style.display = 'none'; table.style.display = 'table';
+    meta.style.display = 'block'; $('user-count').textContent = users.length;
+  }
+
+  async function deleteUser(id) {
+    try {
+      const res = await fetch(`/api/admin/delete-user/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      toast(data.message || 'User deleted', 'success');
+      fetchUsers();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  /* ─── Seed ─── */
+  async function seedUsers() {
+    try {
+      const res = await fetch('/api/admin/seed-users', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      toast(data.message || 'Sample users seeded', 'success');
+      fetchUsers();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
+
+  /* ─── History ─── */
+  async function loadHistory() {
+    const btn = $('load-history-btn');
+    const state = $('history-state');
+    const table = $('history-table');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Loading…';
+    state.innerHTML = '<div class="state-icon">⏳</div><div>Fetching login history…</div>';
+    state.style.display = 'block';
+    table.style.display = 'none';
+
+    try {
+      const res = await fetch('/api/admin/login-history');
+      if (!res.ok) throw new Error((await res.json().catch(()=>({}))).error || 'Failed');
+      const data = await res.json();
+      renderHistory(data.history || []);
+      toast(`Loaded ${(data.history || []).length} records`, 'success');
+    } catch (err) {
+      state.innerHTML = `<div class="state-icon">⚠️</div><div style="color:var(--red)">${err.message}</div>`;
+      toast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '📋 Load History';
+    }
+  }
+
+  function renderHistory(rows) {
+    const tbody = $('history-tbody');
+    const state = $('history-state');
+    const table = $('history-table');
+    const meta  = $('history-count-info');
+
+    if (!rows.length) {
+      state.innerHTML = '<div class="state-icon">📭</div><div>No login attempts recorded yet</div>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map(r => {
+      const isInj = r.is_injection;
+      const isOk  = r.success && !isInj;
+      const cls = isInj ? 'row-inject' : isOk ? 'row-success' : 'row-normal';
+
+      const modeBadge = r.mode === 'vulnerable'
+        ? `<span class="chip chip-red" style="font-size:.72rem">⚠ Vulnerable</span>`
+        : `<span class="chip chip-green" style="font-size:.72rem">🛡 Secure</span>`;
+
+      const injBadge = isInj
+        ? `<span class="chip chip-red" style="font-size:.72rem">☠ YES</span>`
+        : `<span class="chip chip-green" style="font-size:.72rem">✓ No</span>`;
+
+      const resBadge = r.success
+        ? `<span class="chip chip-green" style="font-size:.72rem">✓ Success</span>`
+        : `<span class="chip chip-red" style="font-size:.72rem">✗ Failed</span>`;
+
+      return `<tr class="${cls}">
+        <td style="color:var(--muted)">${esc(r.id)}</td>
+        <td style="font-size:.78rem;color:var(--muted)">${esc(fmtDate(r.timestamp))}</td>
+        <td style="color:var(--cyan);font-weight:600">${esc(r.username || '—')}</td>
+        <td style="font-family:var(--mono);font-size:.78rem;color:var(--yellow)">${esc(r.password || '—')}</td>
+        <td>${modeBadge}</td>
+        <td>${injBadge}</td>
+        <td>${resBadge}</td>
+      </tr>`;
+    }).join('');
+
+    state.style.display = 'none';
+    table.style.display = 'table';
+    meta.style.display = 'block';
+    $('history-count').textContent = rows.length;
+  }
+
+  /* ─── Global Mode ─── */
+  async function loadGlobalMode() {
+    try {
+      const res = await fetch('/api/admin/global-mode');
+      const data = await res.json();
+      updateModeBadge(data.mode);
+    } catch {}
+  }
+
+  function updateModeBadge(mode) {
+    const badge = $('current-mode-badge');
+    if (!badge) return;
+    if (mode === 'vulnerable') {
+      badge.textContent = '⚠ VULNERABLE';
+      badge.className = 'panel-badge badge-danger';
+    } else {
+      badge.textContent = '🛡 SECURE';
+      badge.className = 'panel-badge';
+      badge.style.background = 'rgba(52,211,153,.12)';
+      badge.style.color = 'var(--green)';
+      badge.style.border = '1px solid rgba(52,211,153,.25)';
+    }
+  }
+
+  async function setMode(mode) {
+    try {
+      const res = await fetch('/api/admin/global-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      toast(`Global mode set to: ${mode.toUpperCase()}`, 'success');
+      updateModeBadge(mode);
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
+
+  /* ─── Reset ─── */
+  async function resetDB() {
+    try {
+      const res = await fetch('/api/admin/reset', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      toast(`Database reset. ${data.users_seeded} users re-seeded.`, 'success');
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
+
+  /* ─── Download DB ─── */
+  function downloadDB() {
+    window.location.href = '/api/admin/download-db';
+    toast('Downloading database file…', 'info');
+  }
+
+  /* ─── Logout ─── */
+  async function logout() {
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+    window.location.href = '/login';
+  }
+
+  /* ─── Event Bindings ─── */
+  $('fetch-users-btn').addEventListener('click', fetchUsers);
+  $('refresh-users-btn').addEventListener('click', fetchUsers);
+  $('seed-btn').addEventListener('click', seedUsers);
+  $('load-history-btn').addEventListener('click', loadHistory);
+  $('refresh-history-btn').addEventListener('click', loadHistory);
+  $('download-db-btn').addEventListener('click', downloadDB);
+  $('breach-download-btn').addEventListener('click', downloadDB);
+  $('logout-btn').addEventListener('click', logout);
+
+  $('set-vulnerable-btn').addEventListener('click', () => {
+    confirm('Enable Vulnerable Mode', 'This will make the login page use raw string concatenation SQL for all users. Injections will succeed. Use only for controlled demos.', () => setMode('vulnerable'));
+  });
+  $('set-secure-btn').addEventListener('click', () => setMode('secure'));
+
+  $('seed-controls-btn').addEventListener('click', seedUsers);
+  $('export-btn').addEventListener('click', downloadDB);
+  $('reset-btn').addEventListener('click', () => {
+    confirm('Reset Database', 'This will DROP all tables and recreate them. All registered users (except admin) will be deleted. This cannot be undone.', resetDB);
+  });
+
+  /* ─── Init ─── */
+  loadSession();
+})();
+</script>
+</body>
+</html>

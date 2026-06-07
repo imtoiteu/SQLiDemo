@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Article Search — SQLiLab Demo 2</title>
+  <meta name="description" content="Demo 2: Modern Application — UNION SQL Injection data theft. Even with bcrypt passwords, SQL injection in the search feature exposes password hashes."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#080b14;--s1:#0e1324;--s2:#141928;--s3:#1a2035;
+      --b1:#1e2a45;--b2:#253354;
+      --purple:#6c63ff;--purple2:#a78bfa;
+      --cyan:#22d3ee;--green:#34d399;--red:#f87171;--orange:#fb923c;--yellow:#fbbf24;
+      --text:#e2e8f0;--muted:#64748b;
+      --mono:'JetBrains Mono',monospace;--font:'Inter',sans-serif;
+    }
+    html{scroll-behavior:smooth;overflow-x:hidden}
+    body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;min-height:100vh;overflow-x:hidden}
+    .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
+      background-image:linear-gradient(rgba(34,211,238,.03)1px,transparent 1px),linear-gradient(90deg,rgba(34,211,238,.03)1px,transparent 1px);
+      background-size:40px 40px}
+
+    .nav{position:sticky;top:0;z-index:100;background:rgba(8,11,20,.93);backdrop-filter:blur(20px);border-bottom:1px solid var(--b1)}
+    .nav-i{max-width:1300px;margin:0 auto;padding:0 1.4rem;display:flex;align-items:center;gap:1rem;height:58px}
+    .nav-logo{font-weight:900;font-size:1.05rem;color:var(--text);text-decoration:none}
+    .nav-logo span{color:var(--purple2)}
+    .nav-links{display:flex;gap:.1rem;list-style:none;flex:1;flex-wrap:wrap}
+    .nav-link{padding:.28rem .65rem;border-radius:6px;color:var(--muted);text-decoration:none;font-size:.79rem;font-weight:500;transition:all .2s}
+    .nav-link:hover{color:var(--text);background:rgba(108,99,255,.1)}
+    .nav-link.active{color:var(--cyan);background:rgba(34,211,238,.08)}
+
+    .page{position:relative;z-index:1;max-width:1260px;margin:0 auto;padding:1.8rem 1.4rem 5rem}
+
+    /* Context banner */
+    .ctx-banner{display:flex;align-items:flex-start;gap:1rem;padding:1rem 1.3rem;border-radius:12px;border:1px solid rgba(52,211,153,.22);background:rgba(52,211,153,.04);margin-bottom:1.6rem}
+    .ctx-icon{font-size:2rem;flex-shrink:0}
+    .ctx-text{flex:1}
+    .ctx-title{font-weight:800;font-size:1rem;color:var(--green);margin-bottom:.2rem}
+    .ctx-sub{font-size:.8rem;color:var(--muted);line-height:1.55}
+
+    /* Attack chain */
+    .chain{display:flex;align-items:center;gap:0;padding:.5rem .9rem;background:var(--s2);border:1px solid var(--b1);border-radius:9px;margin-bottom:1.5rem;overflow-x:auto;flex-wrap:wrap;gap:.1rem}
+    .c-step{display:flex;align-items:center;gap:.25rem;font-size:.72rem;font-weight:600;white-space:nowrap;padding:.15rem .25rem;border-radius:4px}
+    .c-step.done{color:var(--green)}
+    .c-step.hl{color:var(--cyan)}
+    .c-step.warn{color:var(--red)}
+    .c-step.dim{color:var(--muted)}
+    .c-arr{color:var(--b2);margin:0 .15rem;font-size:.85rem}
+
+    /* Mode toggle */
+    .mode-toggle{display:inline-flex;align-items:center;background:var(--s2);border:1px solid var(--b1);border-radius:8px;overflow:hidden;margin-bottom:1.2rem}
+    .mt-btn{padding:.38rem .9rem;font-size:.78rem;font-weight:700;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:all .18s}
+    .mt-btn.active.vuln{background:rgba(248,113,113,.12);color:var(--red)}
+    .mt-btn.active.safe{background:rgba(52,211,153,.1);color:var(--green)}
+
+    /* 3-col layout */
+    .grid{display:grid;grid-template-columns:1fr 1.05fr 1fr;gap:1rem;align-items:start}
+
+    .card{background:var(--s1);border:1px solid var(--b1);border-radius:13px;overflow:hidden}
+    .card-h{padding:.78rem 1.1rem;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;gap:.4rem}
+    .card-t{font-weight:800;font-size:.85rem;display:flex;align-items:center;gap:.4rem}
+    .card-b{padding:.9rem 1.1rem}
+
+    .badge{display:inline-flex;align-items:center;padding:.14rem .45rem;border-radius:4px;font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em}
+    .b-red{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:var(--red)}
+    .b-green{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.2);color:var(--green)}
+    .b-orange{background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.22);color:var(--orange)}
+    .b-cyan{background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.18);color:var(--cyan)}
+    .b-muted{background:rgba(100,116,139,.08);border:1px solid rgba(100,116,139,.18);color:var(--muted)}
+
+    /* Search input */
+    .search-wrap{display:flex;gap:.5rem;margin-bottom:.75rem}
+    .search-in{flex:1;padding:.62rem .9rem;border-radius:8px;border:1px solid var(--b1);background:var(--s2);color:var(--text);font-family:var(--mono);font-size:.84rem;outline:none;transition:border-color .18s}
+    .search-in:focus{border-color:var(--cyan)}
+    .search-in.danger:focus{border-color:var(--red)}
+    .btn-search{padding:.62rem 1.1rem;border-radius:8px;border:none;cursor:pointer;font-family:var(--font);font-weight:800;font-size:.82rem;transition:all .2s}
+    .btn-vuln{background:linear-gradient(135deg,var(--red),#ec4899);color:#fff;box-shadow:0 3px 14px rgba(248,113,113,.3)}
+    .btn-vuln:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(248,113,113,.45)}
+    .btn-safe{background:linear-gradient(135deg,#065f46,var(--green));color:#fff;box-shadow:0 3px 14px rgba(52,211,153,.28)}
+    .btn-safe:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(52,211,153,.42)}
+    .btn-search:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
+
+    /* Payload chips */
+    .chips-label{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:.35rem}
+    .chips{display:flex;flex-direction:column;gap:.35rem;margin-bottom:.8rem}
+    .chip{padding:.32rem .65rem;border-radius:6px;font-family:var(--mono);font-size:.71rem;cursor:pointer;border:1px solid;transition:all .18s;line-height:1.4}
+    .chip-safe{border-color:rgba(52,211,153,.25);background:rgba(52,211,153,.06);color:var(--green)}
+    .chip-safe:hover{background:rgba(52,211,153,.13)}
+    .chip-vuln{border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.07);color:var(--red)}
+    .chip-vuln:hover{background:rgba(248,113,113,.14)}
+    .chip-warn{border-color:rgba(251,146,60,.28);background:rgba(251,146,60,.07);color:var(--orange)}
+    .chip-warn:hover{background:rgba(251,146,60,.14)}
+
+    /* SQL display */
+    .sql-box{background:#04060f;border:1px solid var(--b1);border-radius:9px;overflow:hidden}
+    .sql-hdr{padding:.3rem .75rem;background:var(--s2);border-bottom:1px solid var(--b1);font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+    .sql-pre{padding:.7rem .9rem;font-family:var(--mono);font-size:.75rem;line-height:1.7;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+    .kw{color:#c084fc}.str{color:#4ade80}.cmt{color:#4b5563}.num{color:#fb923c}.inj{color:#f87171;font-weight:700;background:rgba(248,113,113,.08);padding:0 1px;border-radius:2px}
+
+    /* Results table */
+    .r-table{width:100%;border-collapse:collapse;font-size:.76rem;margin-top:.5rem}
+    .r-table th{padding:.3rem .6rem;font-size:.62rem;font-weight:800;text-transform:uppercase;color:var(--muted);background:var(--s2);text-align:left;border-bottom:1px solid var(--b1);white-space:nowrap}
+    .r-table td{padding:.38rem .6rem;border-bottom:1px solid rgba(30,42,69,.4);font-family:var(--mono);font-size:.74rem;word-break:break-all}
+    .r-table tr.breach-row td{background:rgba(248,113,113,.04)}
+    .hash-cell{color:var(--red);opacity:.85}
+
+    /* Explanation */
+    .exp{padding:.8rem .9rem;background:var(--s2);border:1px solid var(--b1);border-radius:9px;font-size:.77rem;line-height:1.6;color:var(--muted);white-space:pre-wrap;word-break:break-word}
+
+    /* Breach alert */
+    .breach-alert{display:none;padding:1rem 1.15rem;border-radius:11px;border:1px solid rgba(248,113,113,.45);background:rgba(248,113,113,.06);animation:fi .4s ease,pulse-r 2s ease 1s infinite alternate}
+    .breach-alert.show{display:block}
+    @keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    @keyframes pulse-r{from{box-shadow:0 0 0 rgba(248,113,113,.2)}to{box-shadow:0 0 22px rgba(248,113,113,.2)}}
+    .ba-title{font-weight:900;color:var(--red);font-size:.95rem;margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem}
+    .ba-body{font-size:.78rem;color:rgba(248,113,113,.8);line-height:1.6;margin-bottom:.75rem}
+    .btn-dl{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1.1rem;border-radius:8px;border:none;background:linear-gradient(135deg,var(--red),var(--orange));color:#fff;font-weight:800;font-size:.82rem;cursor:pointer;transition:all .2s;text-decoration:none}
+    .btn-dl:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(248,113,113,.4)}
+    .btn-crack{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1.1rem;border-radius:8px;border:1px solid rgba(167,139,250,.35);background:rgba(108,99,255,.08);color:var(--purple2);font-weight:800;font-size:.82rem;cursor:pointer;text-decoration:none;transition:all .2s;margin-left:.5rem}
+    .btn-crack:hover{background:rgba(108,99,255,.16)}
+
+    /* Key insight cards */
+    .insights{display:grid;grid-template-columns:1fr;gap:.55rem;margin-top:.85rem}
+    .insight{padding:.65rem .8rem;border-radius:8px;border:1px solid var(--b1);background:var(--s2);font-size:.76rem;line-height:1.5}
+    .insight strong{display:block;font-weight:700;margin-bottom:.15rem;font-size:.73rem}
+    .i-red strong{color:var(--red)}
+    .i-green strong{color:var(--green)}
+    .i-orange strong{color:var(--orange)}
+    .i-cyan strong{color:var(--cyan)}
+
+    /* Spin */
+    .spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;vertical-align:middle;margin-right:.3rem}
+    @keyframes rot{to{transform:rotate(360deg)}}
+
+    @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="bg-grid" aria-hidden="true"></div>
+
+<nav class="nav">
+  <div class="nav-i">
+    <a href="/" class="nav-logo">⚡ SQLi<span>Lab</span></a>
+    <ul class="nav-links">
+      <li><a href="/" class="nav-link">Home</a></li>
+      <li><a href="/register" class="nav-link">Register</a></li>
+      <li><a href="/login" class="nav-link">Login</a></li>
+      <li><a href="/search" class="nav-link active">Search</a></li>
+      <li><a href="/inspector" class="nav-link">Inspector</a></li>
+      <li><a href="/admin" class="nav-link">Admin</a></li>
+      <li><a href="/crack" class="nav-link">Password Analysis</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="page">
+
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
+    <div>
+      <h1 style="font-size:1.5rem;font-weight:900;margin-bottom:.25rem">📰 Article Search</h1>
+      <p style="color:var(--muted);font-size:.84rem">Demo 2 — Modern Application · UNION SQL Injection data theft</p>
+    </div>
+    <div class="mode-toggle">
+      <button class="mt-btn active vuln" id="btn-vuln" onclick="setMode('vulnerable')">⚠️ Vulnerable</button>
+      <button class="mt-btn safe" id="btn-safe" onclick="setMode('secure')">🛡️ Secure</button>
+    </div>
+  </div>
+
+  <!-- Context banner -->
+  <div class="ctx-banner">
+    <div class="ctx-icon">🔒</div>
+    <div class="ctx-text">
+      <div class="ctx-title">bcrypt does NOT stop SQL Injection</div>
+      <div class="ctx-sub">
+        The login form in Demo 2 uses bcrypt + parameterised queries — classic login bypass fails.
+        But this article search feature uses raw string concatenation.
+        A UNION SELECT payload can read any table, including the <code style="font-family:var(--mono);color:var(--cyan);background:var(--s2);padding:0 3px;border-radius:3px">users</code> table containing bcrypt hashes.
+        SQL injection and password hashing are <strong style="color:var(--text)">independent security problems</strong>.
+      </div>
+    </div>
+  </div>
+
+  <!-- Attack chain -->
+  <div class="chain">
+    <div class="c-step done">🔒 Login (bcrypt)</div>
+    <div class="c-arr">›</div>
+    <div class="c-step warn">❌ Bypass Fails</div>
+    <div class="c-arr">›</div>
+    <div class="c-step hl" id="chain-here">📰 Search UNION</div>
+    <div class="c-arr">›</div>
+    <div class="c-step dim" id="chain-theft">🧬 Hash Exposed</div>
+    <div class="c-arr">›</div>
+    <div class="c-step dim" id="chain-dl">💾 Download DB</div>
+    <div class="c-arr">›</div>
+    <div class="c-step dim" id="chain-crack">🔓 Crack Hashes</div>
+  </div>
+
+  <div class="grid">
+
+    <!-- Column 1: Input + payloads -->
+    <div style="display:flex;flex-direction:column;gap:.85rem">
+      <div class="card">
+        <div class="card-h">
+          <div class="card-t">🔍 Search Articles</div>
+          <span class="badge b-red" id="mode-badge-main">Vulnerable</span>
+        </div>
+        <div class="card-b">
+          <div class="search-wrap">
+            <input id="search-in" class="search-in danger" placeholder="category_id (try: 1, 2, 3, or a payload)" value="1" autocomplete="off"/>
+            <button class="btn-search btn-vuln" id="search-btn" onclick="doSearch()">Search</button>
+          </div>
+          <div class="chips-label">Normal queries</div>
+          <div class="chips">
+            <span class="chip chip-safe" onclick="load('1')">1  <em style="opacity:.5">→ Security articles</em></span>
+            <span class="chip chip-safe" onclick="load('2')">2  <em style="opacity:.5">→ Cryptography articles</em></span>
+            <span class="chip chip-safe" onclick="load('3')">3  <em style="opacity:.5">→ Attack Chains</em></span>
+          </div>
+          <div class="chips-label" id="injection-label">UNION injection payloads</div>
+          <div class="chips" id="vuln-chips">
+            <span class="chip chip-vuln" onclick="load('0 UNION SELECT username,password_hash,role FROM users--')">0 UNION SELECT username,password_hash,role FROM users--</span>
+            <span class="chip chip-vuln" onclick="load('0 UNION SELECT username,email,role FROM users--')">0 UNION SELECT username,email,role FROM users--</span>
+            <span class="chip chip-warn" onclick="load(&quot;0 UNION SELECT username,password_hash,role FROM users WHERE role='admin'--&quot;)">… WHERE role='admin'--</span>
+            <span class="chip chip-warn" onclick="load('1 AND 1=2')">1 AND 1=2 (error-based)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Key Insights -->
+      <div class="card">
+        <div class="card-h"><div class="card-t">💡 Key Insights</div></div>
+        <div class="card-b">
+          <div class="insights">
+            <div class="insight i-red"><strong>bcrypt ≠ SQL Injection Protection</strong>Password hashing only protects stored hashes. It does not prevent an attacker from reading the database via SQL injection.</div>
+            <div class="insight i-green"><strong>Parameterised Queries Are the Fix</strong>Switch to "Secure" mode to see how parameterisation neutralises UNION attacks completely.</div>
+            <div class="insight i-orange"><strong>SQL Injection Is Everywhere</strong>Any feature that builds SQL from user input is a potential exfiltration point — not just login forms.</div>
+            <div class="insight i-cyan"><strong>bcrypt Still Has Value</strong>Once hashes are stolen, bcrypt slows offline cracking. Weak passwords can still be recovered — try Password Analysis.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column 2: SQL + results -->
+    <div style="display:flex;flex-direction:column;gap:.85rem">
+      <div class="card">
+        <div class="card-h">
+          <div class="card-t">⚡ Generated SQL</div>
+          <span class="badge" id="risk-badge">SAFE</span>
+        </div>
+        <div class="card-b" style="padding:.75rem">
+          <div class="sql-box">
+            <div class="sql-hdr">
+              <span id="sql-tab">Executed Query</span>
+              <span id="row-count" style="font-family:var(--mono);font-size:.7rem;color:var(--cyan)"></span>
+            </div>
+            <div class="sql-pre" id="sql-display"><span class="kw">SELECT</span> id, title, content
+<span class="kw">FROM</span> articles
+<span class="kw">WHERE</span> category_id = <span class="num">1</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results table -->
+      <div class="card" id="results-card">
+        <div class="card-h">
+          <div class="card-t" id="results-title">📋 Query Results</div>
+          <span class="badge b-muted" id="results-badge">0 rows</span>
+        </div>
+        <div class="card-b" style="padding:.75rem;overflow-x:auto">
+          <div id="results-container">
+            <p style="color:var(--muted);font-size:.8rem;text-align:center;padding:.75rem 0">Run a search to see results</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Breach alert -->
+      <div class="breach-alert" id="breach-alert">
+        <div class="ba-title">💥 Database Breach via UNION Injection!</div>
+        <div class="ba-body">
+          SQL injection exposed records from the <code style="font-family:var(--mono)">users</code> table.
+          bcrypt hashes are now in the attacker's possession. They can be cracked offline using a wordlist attack.
+        </div>
+        <a href="/api/admin/download-db" class="btn-dl">💾 Download Leaked Database</a>
+        <a href="/crack" class="btn-crack">🔓 Password Analysis →</a>
+      </div>
+    </div>
+
+    <!-- Column 3: Explanation + comparison -->
+    <div style="display:flex;flex-direction:column;gap:.85rem">
+      <div class="card">
+        <div class="card-h"><div class="card-t">📖 Explanation</div></div>
+        <div class="card-b" style="padding:.75rem">
+          <div class="exp" id="exp-box">Run a search query to see the educational explanation.</div>
+        </div>
+      </div>
+
+      <!-- Comparison table -->
+      <div class="card">
+        <div class="card-h"><div class="card-t">📊 Security Comparison</div></div>
+        <div class="card-b" style="padding:.65rem .9rem">
+          <table style="width:100%;border-collapse:collapse;font-size:.74rem">
+            <thead>
+              <tr>
+                <th style="padding:.3rem .4rem;text-align:left;color:var(--muted);font-weight:700;border-bottom:1px solid var(--b1);font-size:.67rem;text-transform:uppercase">Feature</th>
+                <th style="padding:.3rem .4rem;text-align:center;color:var(--orange);font-weight:700;border-bottom:1px solid var(--b1);font-size:.67rem">Legacy</th>
+                <th style="padding:.3rem .4rem;text-align:center;color:var(--green);font-weight:700;border-bottom:1px solid var(--b1);font-size:.67rem">Modern</th>
+              </tr>
+            </thead>
+            <tbody id="cmp-tbody">
+              <tr><td style="padding:.32rem .4rem;border-bottom:1px solid rgba(30,42,69,.4);color:var(--text)">Login SQLi Bypass</td><td style="text-align:center;color:var(--green)">✅</td><td style="text-align:center;color:var(--red)">❌</td></tr>
+              <tr><td style="padding:.32rem .4rem;border-bottom:1px solid rgba(30,42,69,.4);color:var(--text)">Plaintext Passwords</td><td style="text-align:center;color:var(--green)">✅</td><td style="text-align:center;color:var(--red)">❌</td></tr>
+              <tr><td style="padding:.32rem .4rem;border-bottom:1px solid rgba(30,42,69,.4);color:var(--text)">bcrypt Protection</td><td style="text-align:center;color:var(--red)">❌</td><td style="text-align:center;color:var(--green)">✅</td></tr>
+              <tr><td style="padding:.32rem .4rem;border-bottom:1px solid rgba(30,42,69,.4);color:var(--text)">SQLi Data Theft</td><td style="text-align:center;color:var(--green)">✅</td><td style="text-align:center;color:var(--green)">✅</td></tr>
+              <tr><td style="padding:.32rem .4rem;border-bottom:1px solid rgba(30,42,69,.4);color:var(--text)">UNION Hash Exposure</td><td style="text-align:center;color:var(--green)">✅</td><td style="text-align:center;color:var(--green)">✅</td></tr>
+              <tr><td style="padding:.32rem .4rem;border-bottom:1px solid rgba(30,42,69,.4);color:var(--text)">Offline Hash Cracking</td><td style="text-align:center;color:var(--muted)">N/A (plaintext)</td><td style="text-align:center;color:var(--green)">✅</td></tr>
+              <tr><td style="padding:.32rem .4rem;color:var(--text)">Database Download</td><td style="text-align:center;color:var(--green)">✅</td><td style="text-align:center;color:var(--green)">✅</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  let mode='vulnerable';
+
+  function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+  // Syntax highlight
+  function highlight(sql){
+    const kws=['SELECT','FROM','WHERE','AND','OR','NOT','UNION','ALL','NULL','LIMIT','ORDER','BY','INSERT','UPDATE','DELETE'];
+    let out=sql.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    out=out.replace(/(--[^\n]*)/g,'<span class="cmt">$1</span>');
+    out=out.replace(/'([^']*)'/g,"<span class=\"str\">'$1'</span>");
+    kws.forEach(k=>{out=out.replace(new RegExp(`\\b${k}\\b`,'gi'),`<span class="kw">${k}</span>`)});
+    out=out.replace(/\b(\d+)\b(?![^<]*>)/g,'<span class="num">$1</span>');
+    return out;
+  }
+
+  window.setMode = function(m){
+    mode=m;
+    $('btn-vuln').className='mt-btn'+(m==='vulnerable'?' active vuln':'');
+    $('btn-safe').className='mt-btn'+(m==='secure'?' active safe':'');
+    const isVuln=m==='vulnerable';
+    $('mode-badge-main').textContent=isVuln?'Vulnerable':'Secure';
+    $('mode-badge-main').className='badge '+(isVuln?'b-red':'b-green');
+    $('search-in').className='search-in '+(isVuln?'danger':'');
+    $('search-btn').className='btn-search '+(isVuln?'btn-vuln':'btn-safe');
+    $('injection-label').style.display=isVuln?'':'none';
+    $('vuln-chips').style.display=isVuln?'':'none';
+    $('sql-tab').textContent=isVuln?'Executed Query (Raw)':'Executed Query (Parameterised)';
+    if(!isVuln){
+      $('breach-alert').className='breach-alert';
+      $('chain-theft').className='c-step dim';
+      $('chain-dl').className='c-step dim';
+      $('chain-crack').className='c-step dim';
+    }
+  };
+
+  window.load = function(val){
+    const inp = $('search-in');
+    inp.value = val;
+    // Fire a synthetic input event so the live-preview listener
+    // updates the displayed SQL to match the new value immediately.
+    inp.dispatchEvent(new Event('input'));
+    doSearch();
+  };
+
+  window.doSearch = async function(){
+    const q=$('search-in').value.trim();
+    const btn=$('search-btn');
+    btn.disabled=true;
+    btn.innerHTML='<span class="spin"></span>';
+
+    const endpoint=`/api/search/${mode}?q=${encodeURIComponent(q)}`;
+    try {
+      const res=await fetch(endpoint);
+      const data=await res.json();
+      render(data, q);
+    } catch(e) {
+      $('exp-box').textContent='Network error: '+e.message;
+    } finally {
+      btn.disabled=false;
+      btn.textContent=mode==='vulnerable'?'Search':'Search';
+    }
+  };
+
+  function render(data, raw){
+    // SQL
+    $('sql-display').innerHTML=highlight(data.generated_query||'');
+    $('row-count').textContent=`${data.row_count||0} row(s)`;
+
+    // Risk badge
+    const risk=(data.risk_level||'safe').toUpperCase();
+    const riskColor={'SAFE':'b-green','LOW':'b-cyan','MEDIUM':'b-orange','HIGH':'b-orange','CRITICAL':'b-red'}[risk]||'b-muted';
+    $('risk-badge').textContent=risk;
+    $('risk-badge').className='badge '+riskColor;
+
+    // Explanation
+    $('exp-box').textContent=data.explanation||'';
+
+    // Results table
+    const rows=data.rows||[];
+    const cols=data.columns||[];
+    const isDataTheft=data.is_injection && rows.length>0 && cols.some(c=>c.includes('hash')||c.includes('password'));
+
+    if(rows.length===0){
+      $('results-container').innerHTML='<p style="color:var(--muted);font-size:.8rem;text-align:center;padding:.75rem 0">No rows returned</p>';
+      $('results-badge').textContent='0 rows';
+      $('results-title').textContent='📋 Query Results';
+    } else {
+      $('results-badge').textContent=`${rows.length} rows`;
+      $('results-title').textContent=isDataTheft?'🚨 Exfiltrated Data!':'📋 Query Results';
+      const hdrs=cols.length?cols:Object.keys(rows[0]);
+      const tbody=rows.map(r=>{
+        const cells=hdrs.map(h=>{
+          const v=esc(r[h]||r[h.toLowerCase()]||'');
+          const isHash=h.includes('hash')||h.includes('password');
+          return `<td${isHash?' class="hash-cell"':''}>${isHash&&v.length>30?v.substring(0,20)+'…':v}</td>`;
+        });
+        return `<tr${isDataTheft?' class="breach-row"':''}>${cells.join('')}</tr>`;
+      }).join('');
+      $('results-container').innerHTML=`<table class="r-table"><thead><tr>${hdrs.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${tbody}</tbody></table>`;
+    }
+
+    // Breach alert
+    if(isDataTheft){
+      $('breach-alert').className='breach-alert show';
+      $('chain-theft').className='c-step done';
+      $('chain-dl').className='c-step done';
+      $('chain-crack').className='c-step hl';
+    } else if(data.is_injection){
+      $('breach-alert').className='breach-alert';
+    } else {
+      $('breach-alert').className='breach-alert';
+    }
+
+    // Error
+    if(data.sql_error){
+      $('exp-box').textContent=(data.explanation||'')+'\n\nSQL Error: '+data.sql_error;
+    }
+  }
+
+  // Live preview on input
+  $('search-in').addEventListener('input',()=>{
+    const q=$('search-in').value;
+    if(mode==='vulnerable'){
+      $('sql-display').innerHTML=highlight(
+        `SELECT id, title, content FROM articles WHERE category_id = ${q}`
+      );
+    }
+  });
+
+  // Auto-run on load
+  doSearch();
+})();
+</script>
+</body>
+</html>

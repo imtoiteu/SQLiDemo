@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SQLi Lab — Interactive SQL Injection Learning Platform</title>
+  <meta name="description"
+    content="An interactive educational platform to learn, explore, and understand SQL Injection attack techniques and payload patterns for ethical security research." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Animated Background -->
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow" aria-hidden="true"></div>
+
+  <!-- Navbar -->
+  <nav class="navbar" id="navbar" role="navigation" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo" id="nav-logo-link" aria-label="SQLi Lab Home">
+        <span class="logo-icon" aria-hidden="true">⚡</span>
+        <span>SQLi<span class="logo-accent">Lab</span></span>
+      </a>
+      <ul class="nav-links" role="list">
+        <li><a href="#overview" id="nav-overview" class="nav-link">Overview</a></li>
+        <li><a href="#payloads" id="nav-payloads" class="nav-link">Payloads</a></li>
+        <li><a href="#demo" id="nav-demo" class="nav-link">Demo</a></li>
+        <li class="nav-divider" aria-hidden="true"></li>
+        <li><a href="/register" id="nav-register" class="nav-link nav-link-cta">Register</a></li>
+        <li><a href="/login" id="nav-login" class="nav-link">Login</a></li>
+        <li><a href="/inspector" id="nav-inspector" class="nav-link">Inspector</a></li>
+        <li><a href="/flow" id="nav-flow" class="nav-link">Attack Flow</a></li>
+        <li><a href="/compare" id="nav-compare" class="nav-link">Compare</a></li>
+        <li><a href="/teacher" id="nav-teacher" class="nav-link">Teacher</a></li>
+      </ul>
+      <span class="nav-badge" aria-label="For educational use only">🎓 Educational</span>
+    </div>
+  </nav>
+
+
+  <!-- Hero Section -->
+  <header class="hero" id="overview">
+    <div class="hero-content">
+      <div class="hero-eyebrow" id="hero-eyebrow">
+        <span class="pulse-dot" aria-hidden="true"></span>
+        Security Research & Education
+      </div>
+      <h1 class="hero-title" id="hero-title">
+        SQL Injection
+        <span class="gradient-text">Attack Lab</span>
+      </h1>
+      <p class="hero-subtitle" id="hero-subtitle">
+        Explore, understand, and defend against SQL injection vulnerabilities.
+        Browse <strong>500+ payloads</strong>, simulate attacks, and master
+        database security — all in a safe, controlled environment.
+      </p>
+      <div class="hero-stats" id="hero-stats">
+        <div class="stat-card" id="stat-payloads">
+          <span class="stat-num" data-count="500">0</span>
+          <span class="stat-label">Payloads</span>
+        </div>
+        <div class="stat-card" id="stat-types">
+          <span class="stat-num" data-count="8">0</span>
+          <span class="stat-label">Attack Types</span>
+        </div>
+        <div class="stat-card" id="stat-dbs">
+          <span class="stat-num" data-count="5">0</span>
+          <span class="stat-label">Databases</span>
+        </div>
+        <div class="stat-card" id="stat-categories">
+          <span class="stat-num" data-count="12">0</span>
+          <span class="stat-label">Categories</span>
+        </div>
+      </div>
+      <div class="hero-cta">
+        <a href="#payloads" class="btn btn-primary" id="cta-explore">Explore Payloads</a>
+        <a href="#demo" class="btn btn-ghost" id="cta-demo">Live Demo →</a>
+      </div>
+    </div>
+    <div class="hero-visual" aria-hidden="true">
+      <div class="code-window" id="hero-code-window">
+        <div class="window-bar">
+          <span class="dot red"></span>
+          <span class="dot yellow"></span>
+          <span class="dot green"></span>
+          <span class="window-title">attack.sql</span>
+        </div>
+        <pre class="window-code" id="hero-code-content"></pre>
+      </div>
+    </div>
+  </header>
+
+  <!-- Attack Types -->
+  <section class="section" id="types">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">SQL Injection <span class="gradient-text">Attack Types</span></h2>
+        <p class="section-sub">Understanding the taxonomy of SQLi vulnerabilities is the first step to building robust defenses.</p>
+      </div>
+      <div class="types-grid" id="types-grid" role="list"></div>
+    </div>
+  </section>
+
+  <!-- Payload Explorer -->
+  <section class="section section-alt" id="payloads">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Payload <span class="gradient-text">Explorer</span></h2>
+        <p class="section-sub">Browse and search through the full payload database, categorized by type and target database.</p>
+      </div>
+
+      <!-- Search & Filters -->
+      <div class="explorer-controls" id="explorer-controls">
+        <div class="search-wrap">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input
+            type="search"
+            id="payload-search"
+            class="search-input"
+            placeholder="Search payloads… e.g. UNION, sleep, OR 1=1"
+            aria-label="Search payloads"
+          />
+          <kbd class="search-shortcut" aria-hidden="true">⌘K</kbd>
+        </div>
+        <div class="filter-tabs" id="filter-tabs" role="tablist" aria-label="Payload category filters">
+          <button class="tab active" id="tab-all" role="tab" aria-selected="true" data-cat="all">All</button>
+          <button class="tab" id="tab-generic" role="tab" aria-selected="false" data-cat="generic">Generic</button>
+          <button class="tab" id="tab-error" role="tab" aria-selected="false" data-cat="error">Error-Based</button>
+          <button class="tab" id="tab-union" role="tab" aria-selected="false" data-cat="union">UNION</button>
+          <button class="tab" id="tab-blind" role="tab" aria-selected="false" data-cat="blind">Blind</button>
+          <button class="tab" id="tab-time" role="tab" aria-selected="false" data-cat="time">Time-Based</button>
+          <button class="tab" id="tab-auth" role="tab" aria-selected="false" data-cat="auth">Auth Bypass</button>
+        </div>
+      </div>
+
+      <!-- Payload List -->
+      <div class="payload-layout">
+        <div class="payload-list-wrap">
+          <div class="payload-count" id="payload-count" aria-live="polite">Loading payloads…</div>
+          <div class="payload-list" id="payload-list" role="list" aria-label="Payload results"></div>
+          <button class="btn btn-ghost load-more" id="load-more-btn">Load More</button>
+        </div>
+        <div class="payload-detail" id="payload-detail">
+          <div class="detail-placeholder" id="detail-placeholder">
+            <div class="placeholder-icon" aria-hidden="true">🎯</div>
+            <p>Select a payload to inspect it</p>
+          </div>
+          <div class="detail-content" id="detail-content" style="display:none">
+            <div class="detail-header">
+              <span class="detail-badge" id="detail-badge">Generic</span>
+              <button class="copy-btn" id="detail-copy-btn" aria-label="Copy payload to clipboard">📋 Copy</button>
+            </div>
+            <pre class="detail-code" id="detail-code"></pre>
+            <div class="detail-meta">
+              <div class="meta-row" id="detail-meta-danger">
+                <span class="meta-label">Risk Level</span>
+                <span class="risk-bar-wrap" id="detail-risk-bar"></span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Category</span>
+                <span id="detail-meta-category" class="meta-value">—</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Target DB</span>
+                <span id="detail-meta-db" class="meta-value">—</span>
+              </div>
+            </div>
+            <div class="detail-explanation" id="detail-explanation"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Live Demo -->
+  <section class="section" id="demo">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Live <span class="gradient-text">Demo</span></h2>
+        <p class="section-sub">Simulate a SQL injection attack against a mock login form in a safe, sandboxed environment. No real database is touched.</p>
+      </div>
+      <div class="demo-layout" id="demo-layout">
+        <!-- Victim Panel -->
+        <div class="demo-panel" id="demo-victim-panel">
+          <div class="panel-header">
+            <span class="panel-icon" aria-hidden="true">🖥️</span>
+            <span>Victim Application</span>
+            <span class="panel-badge victim">VULNERABLE</span>
+          </div>
+          <div class="login-form-mock" id="login-form-mock">
+            <div class="mock-logo" aria-hidden="true">🏦</div>
+            <h3 class="mock-title">SecureBank Login</h3>
+            <div class="form-group">
+              <label for="demo-username" class="form-label">Username</label>
+              <input
+                type="text"
+                id="demo-username"
+                class="form-input"
+                placeholder="Enter username"
+                value="admin"
+                aria-describedby="username-hint"
+              />
+              <span id="username-hint" class="input-hint">Try: admin, user, ' OR '1'='1</span>
+            </div>
+            <div class="form-group">
+              <label for="demo-password" class="form-label">Password</label>
+              <input
+                type="text"
+                id="demo-password"
+                class="form-input"
+                placeholder="Enter password"
+                value=""
+                aria-describedby="password-hint"
+              />
+              <span id="password-hint" class="input-hint">Try: ' OR '1'='1'-- or wrong123</span>
+            </div>
+            <button class="btn btn-primary full-width" id="demo-login-btn">Login →</button>
+            <div class="demo-result" id="demo-result" role="alert" aria-live="assertive"></div>
+          </div>
+        </div>
+
+        <!-- SQL Console Panel -->
+        <div class="demo-panel" id="demo-sql-panel">
+          <div class="panel-header">
+            <span class="panel-icon" aria-hidden="true">🗃️</span>
+            <span>SQL Query Inspector</span>
+            <span class="panel-badge attacker">ATTACKER VIEW</span>
+          </div>
+          <div class="sql-console" id="sql-console">
+            <div class="console-label">Generated SQL Query:</div>
+            <pre class="console-code" id="console-query">SELECT * FROM users
+WHERE username = '<span class="hl-inject">admin</span>'
+AND password = '<span class="hl-val">???</span>'</pre>
+            <div class="console-label">Query Result:</div>
+            <div class="console-result" id="console-result">
+              <span class="result-waiting">⏳ Submit the form to see results…</span>
+            </div>
+            <div class="console-label">Injected Payload Detection:</div>
+            <div class="injection-analysis" id="injection-analysis">
+              <span class="analysis-safe">✅ No injection detected</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Payloads -->
+        <div class="demo-panel demo-panel-full" id="demo-quick-panel">
+          <div class="panel-header">
+            <span class="panel-icon" aria-hidden="true">⚡</span>
+            <span>Quick Inject Presets</span>
+          </div>
+          <div class="quick-payloads" id="quick-payloads" role="list"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tools Section -->
+  <section class="section section-alt" id="tools">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Security <span class="gradient-text">Tools</span></h2>
+        <p class="section-sub">Industry-standard tools used for SQL injection testing and defense.</p>
+      </div>
+      <div class="tools-grid" id="tools-grid" role="list"></div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-logo">
+          <span aria-hidden="true">⚡</span> SQLi<span class="logo-accent">Lab</span>
+        </div>
+        <p class="footer-disclaimer">
+          ⚠️ <strong>Educational Use Only.</strong> All payloads and demonstrations are
+          strictly for learning, CTF participation, and authorized penetration testing.
+          Never use these techniques against systems you do not own or have explicit
+          written permission to test.
+        </p>
+        <p class="footer-copy">
+          © 2026 SQLiLab — Built for cybersecurity education.
+          Payload data from the SQL-Injection-Payloads-List repository.
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

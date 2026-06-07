@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — SQLiLab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080b14;
+      --surface:  #0e1324;
+      --surface2: #141928;
+      --border:   #1e2a45;
+      --accent:   #6c63ff;
+      --accent2:  #a78bfa;
+      --cyan:     #22d3ee;
+      --green:    #34d399;
+      --red:      #f87171;
+      --orange:   #fb923c;
+      --yellow:   #fbbf24;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --font:     'Inter', sans-serif;
+      --mono:     'JetBrains Mono', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* Background */
+    .bg-grid {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(108,99,255,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(108,99,255,.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .bg-glow {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(108,99,255,.15), transparent);
+    }
+
+    /* Navbar */
+    .navbar {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(8,11,20,.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      max-width: 1400px; margin: 0 auto;
+      padding: 0 2rem;
+      display: flex; align-items: center; gap: 2rem;
+      height: 60px;
+    }
+    .nav-logo {
+      font-weight: 800; font-size: 1.2rem;
+      color: var(--text); text-decoration: none;
+      display: flex; align-items: center; gap: .4rem;
+    }
+    .logo-accent { color: var(--accent); }
+    .nav-links { display: flex; gap: .25rem; list-style: none; flex: 1; }
+    .nav-link {
+      padding: .4rem .85rem; border-radius: 6px;
+      color: var(--muted); text-decoration: none; font-size: .85rem;
+      font-weight: 500; transition: color .2s, background .2s;
+    }
+    .nav-link:hover, .nav-link.active { color: var(--text); background: rgba(108,99,255,.12); }
+    .nav-link.active { color: var(--accent); }
+    .nav-badge {
+      font-size: .75rem; font-weight: 600;
+      padding: .3rem .7rem; border-radius: 20px;
+      background: rgba(108,99,255,.15); color: var(--accent2);
+      border: 1px solid rgba(108,99,255,.3);
+      white-space: nowrap;
+    }
+
+    /* Layout */
+    main {
+      position: relative; z-index: 1;
+      max-width: 1300px; margin: 0 auto;
+      padding: 2rem 2rem 4rem;
+    }
+
+    /* Session Banner */
+    .session-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+      margin-bottom: 1.5rem;
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+    }
+    .session-bar .s-label { color: var(--muted); font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+    .session-bar .s-val { font-family: var(--mono); font-size: .9rem; color: var(--cyan); }
+    .session-sep { width: 1px; height: 28px; background: var(--border); }
+    .session-chip {
+      display: inline-flex; align-items: center; gap: .4rem;
+      padding: .25rem .65rem; border-radius: 20px; font-size: .78rem; font-weight: 600;
+    }
+    .chip-secure { background: rgba(52,211,153,.12); color: var(--green); border: 1px solid rgba(52,211,153,.3); }
+    .chip-vulnerable { background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+    .chip-admin { background: rgba(251,146,60,.12); color: var(--orange); border: 1px solid rgba(251,146,60,.3); }
+    .chip-user { background: rgba(108,99,255,.12); color: var(--accent2); border: 1px solid rgba(108,99,255,.3); }
+
+    /* Breach Banner */
+    .breach-banner {
+      display: none;
+      align-items: center; gap: 1rem;
+      background: rgba(248,113,113,.08);
+      border: 2px solid var(--red);
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+      margin-bottom: 1.5rem;
+      animation: breach-pulse 1.5s ease-in-out infinite;
+    }
+    .breach-banner.show { display: flex; }
+    @keyframes breach-pulse {
+      0%,100% { border-color: var(--red); box-shadow: 0 0 0 0 rgba(248,113,113,.4); }
+      50% { border-color: #ff4444; box-shadow: 0 0 20px rgba(248,113,113,.3); }
+    }
+    .breach-icon { font-size: 1.8rem; animation: breach-blink 1s ease infinite; }
+    @keyframes breach-blink { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+    .breach-text h3 { color: var(--red); font-weight: 800; font-size: 1.1rem; letter-spacing: .05em; }
+    .breach-text p { color: rgba(248,113,113,.8); font-size: .85rem; }
+
+    /* Not-logged-in */
+    .not-logged-in {
+      display: none;
+      text-align: center; padding: 4rem 2rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; margin-bottom: 1.5rem;
+    }
+    .not-logged-in.show { display: block; }
+    .not-logged-in h2 { font-size: 1.5rem; color: var(--muted); margin-bottom: .75rem; }
+    .not-logged-in a { color: var(--accent); text-decoration: none; font-weight: 600; }
+    .not-logged-in a:hover { text-decoration: underline; }
+
+    /* Page heading */
+    .page-heading {
+      display: flex; align-items: center; gap: 1rem;
+      margin-bottom: 2rem; flex-wrap: wrap;
+    }
+    .page-heading h1 { font-size: 1.8rem; font-weight: 800; }
+    .gradient-text {
+      background: linear-gradient(135deg, var(--accent), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    /* Panel */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .panel-header {
+      display: flex; align-items: center; gap: .75rem;
+      margin-bottom: 1.25rem; padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-title { font-size: 1rem; font-weight: 700; }
+    .panel-subtitle { font-size: .82rem; color: var(--muted); margin-top: .1rem; }
+    .panel-badge-warning {
+      margin-left: auto;
+      padding: .25rem .65rem; border-radius: 6px; font-size: .75rem; font-weight: 700;
+      background: rgba(248,113,113,.12); color: var(--red);
+      border: 1px solid rgba(248,113,113,.3);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .6rem 1.25rem; border-radius: 8px; font-size: .88rem;
+      font-family: var(--font); font-weight: 600; cursor: pointer;
+      border: 1px solid transparent; transition: all .2s; text-decoration: none;
+    }
+    .btn-primary {
+      background: var(--accent); color: #fff;
+      border-color: var(--accent);
+    }
+    .btn-primary:hover { background: #5a52e0; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(108,99,255,.4); }
+    .btn-ghost {
+      background: transparent; color: var(--text);
+      border-color: var(--border);
+    }
+    .btn-ghost:hover { background: var(--surface2); border-color: var(--accent); color: var(--accent); }
+    .btn-danger {
+      background: rgba(248,113,113,.1); color: var(--red);
+      border-color: rgba(248,113,113,.3);
+    }
+    .btn-danger:hover { background: rgba(248,113,113,.2); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+
+    /* Terminal table */
+    .terminal-wrap {
+      background: #050810;
+      border: 1px solid rgba(52,211,153,.2);
+      border-radius: 10px;
+      overflow: auto;
+      font-family: var(--mono);
+    }
+    .terminal-topbar {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .75rem 1rem;
+      border-bottom: 1px solid rgba(52,211,153,.15);
+      background: rgba(52,211,153,.04);
+    }
+    .term-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .term-dot.r { background: #f87171; }
+    .term-dot.y { background: #fbbf24; }
+    .term-dot.g { background: #34d399; }
+    .term-title { margin-left: .5rem; font-size: .78rem; color: rgba(52,211,153,.6); }
+    .term-table {
+      width: 100%; border-collapse: collapse;
+      font-size: .8rem;
+    }
+    .term-table th {
+      padding: .6rem 1rem; text-align: left;
+      color: var(--green); text-transform: uppercase;
+      letter-spacing: .08em; font-size: .72rem;
+      border-bottom: 1px solid rgba(52,211,153,.15);
+      position: sticky; top: 0; background: #050810;
+    }
+    .term-table td {
+      padding: .55rem 1rem;
+      color: rgba(52,211,153,.85);
+      border-bottom: 1px solid rgba(52,211,153,.06);
+      vertical-align: middle;
+    }
+    .term-table tr:last-child td { border-bottom: none; }
+    .term-table tr:hover td { background: rgba(52,211,153,.04); color: var(--green); }
+    .hash-cell { max-width: 180px; }
+    .hash-short {
+      display: inline-block; max-width: 140px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      cursor: help; vertical-align: middle;
+    }
+    .bcrypt-badge {
+      display: inline-block; margin-left: .4rem;
+      padding: .1rem .4rem; border-radius: 4px; font-size: .68rem; font-weight: 700;
+      background: rgba(108,99,255,.15); color: var(--accent2);
+      border: 1px solid rgba(108,99,255,.25); vertical-align: middle;
+    }
+    .role-badge {
+      display: inline-block; padding: .15rem .5rem;
+      border-radius: 4px; font-size: .75rem; font-weight: 700;
+    }
+    .role-admin { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+    .role-teacher { background: rgba(251,146,60,.15); color: var(--orange); border: 1px solid rgba(251,146,60,.3); }
+    .role-student, .role-user { background: rgba(108,99,255,.15); color: var(--accent2); border: 1px solid rgba(108,99,255,.3); }
+
+    /* Loading / empty states */
+    .state-box {
+      text-align: center; padding: 3rem 1rem;
+      color: var(--muted); font-size: .9rem;
+    }
+    .state-box .state-icon { font-size: 2.5rem; margin-bottom: .75rem; }
+
+    /* Callout boxes */
+    .callout-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem; margin-top: 1.25rem;
+    }
+    .callout {
+      border-radius: 10px; padding: 1.1rem 1.25rem;
+      border-left: 4px solid;
+    }
+    .callout-green {
+      background: rgba(52,211,153,.07);
+      border-color: var(--green);
+    }
+    .callout-red {
+      background: rgba(248,113,113,.07);
+      border-color: var(--red);
+    }
+    .callout-orange {
+      background: rgba(251,146,60,.07);
+      border-color: var(--orange);
+    }
+    .callout h4 { font-size: .88rem; font-weight: 700; margin-bottom: .35rem; }
+    .callout-green h4 { color: var(--green); }
+    .callout-red h4 { color: var(--red); }
+    .callout-orange h4 { color: var(--orange); }
+    .callout p { font-size: .82rem; color: var(--muted); line-height: 1.5; }
+
+    /* Educational notice */
+    .edu-notice {
+      margin-top: 1rem;
+      padding: .85rem 1.2rem;
+      border-radius: 8px;
+      background: rgba(108,99,255,.08);
+      border: 1px solid rgba(108,99,255,.2);
+      font-size: .85rem; color: var(--accent2);
+      display: flex; align-items: flex-start; gap: .6rem;
+    }
+    .edu-notice .notice-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: .05rem; }
+
+    /* Action bar */
+    .action-bar {
+      display: flex; align-items: center; gap: .75rem;
+      flex-wrap: wrap; margin-bottom: 1.25rem;
+    }
+
+    /* Scroll inside terminal */
+    .terminal-scroll { max-height: 420px; overflow-y: auto; }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block; width: 18px; height: 18px;
+      border: 2px solid rgba(108,99,255,.3);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: .85rem 1.25rem;
+      font-size: .88rem; color: var(--text);
+      transform: translateY(120%); opacity: 0;
+      transition: all .3s; box-shadow: 0 8px 32px rgba(0,0,0,.5);
+      max-width: 340px;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: var(--green); color: var(--green); }
+    .toast.error { border-color: var(--red); color: var(--red); }
+
+    /* Scan line effect on terminal */
+    .terminal-wrap::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 3px,
+        rgba(0,0,0,.08) 3px, rgba(0,0,0,.08) 4px
+      );
+    }
+    .terminal-wrap { position: relative; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      main { padding: 1rem 1rem 3rem; }
+      .page-heading h1 { font-size: 1.4rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="bg-glow" aria-hidden="true"></div>
+
+<!-- Navbar -->
+<nav class="navbar" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">
+      <span>⚡</span>
+      <span>SQLi<span class="logo-accent">Lab</span></span>
+    </a>
+    <ul class="nav-links" role="list">
+      <li><a href="/" class="nav-link">Home</a></li>
+      <li><a href="/register" class="nav-link">Register</a></li>
+      <li><a href="/login" class="nav-link">Login</a></li>
+      <li><a href="/inspector" class="nav-link">Inspector</a></li>
+      <li><a href="/dashboard" class="nav-link active">Dashboard</a></li>
+      <li><a href="/admin" class="nav-link" style="color:var(--orange)">⚙ Admin Panel</a></li>
+    </ul>
+    <span class="nav-badge">🎓 Educational</span>
+  </div>
+</nav>
+
+<main>
+
+  <!-- Not logged in state -->
+  <div class="not-logged-in" id="not-logged-in">
+    <div style="font-size:3rem;margin-bottom:.75rem">🔒</div>
+    <h2>Authentication Required</h2>
+    <p style="color:var(--muted);margin:.5rem 0 1.25rem">You need to be logged in to view this dashboard.</p>
+    <a href="/login" class="btn btn-primary" style="display:inline-flex;">→ Go to Login</a>
+  </div>
+
+  <!-- Breach Banner -->
+  <div class="breach-banner" id="breach-banner" role="alert">
+    <div class="breach-icon">☠️</div>
+    <div class="breach-text">
+      <h3>⚠ BREACH DETECTED — INJECTION BYPASS ACTIVE</h3>
+      <p>This session was authenticated via SQL injection. The security perimeter has been compromised.</p>
+    </div>
+  </div>
+
+  <!-- Session Info Bar -->
+  <div class="session-bar" id="session-bar" style="display:none">
+    <div>
+      <div class="s-label">User</div>
+      <div class="s-val" id="sb-username">—</div>
+    </div>
+    <div class="session-sep"></div>
+    <div>
+      <div class="s-label">Role</div>
+      <div id="sb-role">—</div>
+    </div>
+    <div class="session-sep"></div>
+    <div>
+      <div class="s-label">Login Mode</div>
+      <div id="sb-mode">—</div>
+    </div>
+    <div class="session-sep"></div>
+    <div>
+      <div class="s-label">Injection Bypass</div>
+      <div id="sb-bypass">—</div>
+    </div>
+    <div style="margin-left:auto">
+      <button class="btn btn-ghost" id="logout-btn" style="font-size:.82rem;padding:.4rem .9rem">Logout</button>
+    </div>
+  </div>
+
+  <!-- Page Heading -->
+  <div class="page-heading" id="main-content" style="display:none">
+    <div>
+      <h1>Database <span class="gradient-text">Breach Simulation</span></h1>
+      <p style="color:var(--muted);font-size:.88rem;margin-top:.25rem">
+        Educational exposure of database contents — demonstrating what attackers can see
+      </p>
+    </div>
+  </div>
+
+  <!-- Database Exposure Panel -->
+  <div class="panel" id="db-panel" style="display:none">
+    <div class="panel-header">
+      <span style="font-size:1.3rem">🗃️</span>
+      <div>
+        <div class="panel-title">Database Contents — Educational Breach Simulation</div>
+        <div class="panel-subtitle">What an attacker sees after gaining database access</div>
+      </div>
+      <span class="panel-badge-warning">⚠ SENSITIVE DATA</span>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-primary" id="fetch-users-btn">
+        <span>⚡</span> Fetch All Users
+      </button>
+      <button class="btn btn-ghost" id="refresh-btn">
+        <span>↻</span> Refresh
+      </button>
+      <button class="btn btn-ghost" id="download-db-btn" style="display:none">
+        <span>💾</span> Download .db File
+      </button>
+      <a href="/admin" class="btn btn-ghost" id="admin-panel-btn" style="display:none;color:var(--orange);border-color:rgba(251,146,60,.3)">
+        <span>⚙</span> Admin Panel
+      </a>
+      <div id="table-meta" style="margin-left:auto;color:var(--muted);font-size:.82rem;display:none">
+        <span id="user-count">0</span> records found
+      </div>
+    </div>
+
+    <!-- Terminal Table -->
+    <div class="terminal-wrap">
+      <div class="terminal-topbar">
+        <div class="term-dot r"></div>
+        <div class="term-dot y"></div>
+        <div class="term-dot g"></div>
+        <span class="term-title">root@sqlilab:~$ SELECT * FROM users;</span>
+      </div>
+      <div class="terminal-scroll">
+        <div id="table-state" class="state-box">
+          <div class="state-icon">💤</div>
+          <div>Click <strong style="color:var(--accent)">Fetch All Users</strong> to load database contents</div>
+        </div>
+        <table class="term-table" id="users-table" style="display:none">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Password Hash</th>
+              <th>Role</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="edu-notice">
+      <span class="notice-icon">🛡️</span>
+      <span>
+        <strong>Even with full DB access, bcrypt hashes cannot be reversed.</strong>
+        The attacker sees the hash but cannot derive the original password — bcrypt is a one-way function with a random salt.
+      </span>
+    </div>
+
+    <!-- Callouts -->
+    <div class="callout-grid">
+      <div class="callout callout-green">
+        <h4>✅ What bcrypt protects</h4>
+        <p>Even if an attacker gains full database access, they cannot see or reverse the original passwords. Each hash is unique due to random salting.</p>
+      </div>
+      <div class="callout callout-red">
+        <h4>❌ What was exposed</h4>
+        <p>Usernames, emails, and roles are still visible and exploitable — this data can be used for phishing, social engineering, and targeted attacks.</p>
+      </div>
+      <div class="callout callout-orange">
+        <h4>📖 Lesson Learned</h4>
+        <p>Always hash passwords with a strong algorithm (bcrypt, argon2). Never store plaintext. Minimize data collection to reduce breach impact.</p>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Toast -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ── Helpers ── */
+  const $ = id => document.getElementById(id);
+  let toastTimer = null;
+
+  function showToast(msg, type = '') {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.className = 'toast'; }, 3500);
+  }
+
+  function formatDate(str) {
+    if (!str) return '—';
+    try { return new Date(str).toLocaleString(); } catch { return str; }
+  }
+
+  function truncateHash(hash, len = 22) {
+    if (!hash) return '—';
+    return hash.length > len ? hash.slice(0, len) + '…' : hash;
+  }
+
+  function getRoleBadge(role) {
+    const r = (role || '').toLowerCase();
+    const cls = r === 'admin' ? 'role-admin'
+              : r === 'teacher' ? 'role-teacher'
+              : 'role-user';
+    return `<span class="role-badge ${cls}">${role || '?'}</span>`;
+  }
+
+  /* ── Session ── */
+  async function loadSession() {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (!res.ok) {
+        $('not-logged-in').classList.add('show');
+        return null;
+      }
+      const data = await res.json();
+      return data;
+    } catch {
+      $('not-logged-in').classList.add('show');
+      return null;
+    }
+  }
+
+  function renderSession(user) {
+    $('not-logged-in').classList.remove('show');
+    $('session-bar').style.display = 'flex';
+    $('main-content').style.display = 'flex';
+    $('db-panel').style.display = 'block';
+
+    $('sb-username').textContent = user.username || '—';
+
+    const role = user.role || 'user';
+    $('sb-role').innerHTML = getRoleBadge(role);
+
+    const mode = user.login_mode || user.mode || 'unknown';
+    const modeEl = $('sb-mode');
+    modeEl.innerHTML = mode === 'vulnerable'
+      ? '<span class="session-chip chip-vulnerable">⚠ Vulnerable</span>'
+      : '<span class="session-chip chip-secure">🔒 Secure</span>';
+
+    const bypass = user.injection_bypass || user.bypass || false;
+    const bypassEl = $('sb-bypass');
+    bypassEl.innerHTML = bypass
+      ? '<span class="session-chip chip-vulnerable">☠ YES — Bypassed</span>'
+      : '<span class="session-chip chip-secure">✓ Normal Login</span>';
+
+    if (bypass) {
+      $('breach-banner').classList.add('show');
+    }
+
+    const isAdminOrBypass = role === 'admin' || bypass;
+    if (isAdminOrBypass) {
+      $('download-db-btn').style.display = 'inline-flex';
+    }
+  }
+
+  /* ── Users Table ── */
+  async function fetchUsers() {
+    const btn = $('fetch-users-btn');
+    const state = $('table-state');
+    const table = $('users-table');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Loading…';
+    state.innerHTML = '<div class="state-icon">⏳</div><div>Querying database…</div>';
+    state.style.display = 'block';
+    table.style.display = 'none';
+
+    try {
+      const res = await fetch('/api/admin/users');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to fetch users');
+      }
+      const data = await res.json();
+      const users = data.users || data || [];
+      renderUsersTable(users);
+      showToast(`Loaded ${users.length} records from database`, 'success');
+    } catch (err) {
+      state.innerHTML = `<div class="state-icon">⚠️</div><div style="color:var(--red)">${err.message}</div>`;
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span>⚡</span> Fetch All Users';
+    }
+  }
+
+  function renderUsersTable(users) {
+    const tbody = $('users-tbody');
+    const state = $('table-state');
+    const table = $('users-table');
+    const meta = $('table-meta');
+
+    if (!users.length) {
+      state.innerHTML = '<div class="state-icon">🚫</div><div>No users found in database</div>';
+      return;
+    }
+
+    tbody.innerHTML = users.map(u => `
+      <tr>
+        <td style="color:var(--muted)">${u.id || '?'}</td>
+        <td style="color:var(--cyan);font-weight:600">${escHtml(u.username || '—')}</td>
+        <td>${escHtml(u.email || '—')}</td>
+        <td class="hash-cell">
+          <span class="hash-short" title="${escHtml(u.password_hash || u.password || '')}">${truncateHash(u.password_hash || u.password || '—')}</span>
+          <span class="bcrypt-badge">BCRYPT</span>
+        </td>
+        <td>${getRoleBadge(u.role)}</td>
+        <td style="color:var(--muted);font-size:.75rem">${formatDate(u.created_at)}</td>
+      </tr>
+    `).join('');
+
+    state.style.display = 'none';
+    table.style.display = 'table';
+    meta.style.display = 'block';
+    $('user-count').textContent = users.length;
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ── Logout ── */
+  async function logout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {}
+    window.location.href = '/login';
+  }
+
+  /* ── Download DB ── */
+  function downloadDB() {
+    window.location.href = '/api/admin/download-db';
+    showToast('Downloading database file…', 'success');
+  }
+
+  /* ── Init ── */
+  async function init() {
+    const user = await loadSession();
+    if (user) renderSession(user);
+
+    $('fetch-users-btn').addEventListener('click', fetchUsers);
+    $('refresh-btn').addEventListener('click', fetchUsers);
+    $('download-db-btn').addEventListener('click', downloadDB);
+    $('logout-btn').addEventListener('click', logout);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
